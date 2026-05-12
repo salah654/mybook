@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 KDP Pro — مولّد الكتب المتطور</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* ══════════════════════════════════════════
+   DESIGN SYSTEM — Luxury Editorial Dark
+══════════════════════════════════════════ */
+:root {
+  --void:    #08090c;
+  --dark:    #0f1117;
+  --panel:   #141720;
+  --card:    #1a1e2a;
+  --lift:    #1f2435;
+  --gold:    #c9a84c;
+  --gold2:   #e2c97e;
+  --gold3:   #f5e6b4;
+  --jade:    #2d6a4f;
+  --jade2:   #40916c;
+  --crimson: #8b1a1a;
+  --sky:     #2d6fa8;
+  --text:    #edeae2;
+  --text2:   #9fa3b0;
+  --text3:   #575d70;
+  --border:  rgba(201,168,76,.15);
+  --border2: rgba(255,255,255,.06);
+  --shadow:  0 8px 32px rgba(0,0,0,.5);
+  --r:       12px;
+  --r2:      8px;
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { font-size:14px; scroll-behavior:smooth; }
+body { font-family:'Cairo',sans-serif; background:var(--void); color:var(--text); min-height:100vh; overflow-x:hidden; direction:rtl; }
+
+/* Grain overlay */
+body::after { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.03'/%3E%3C/svg%3E"); pointer-events:none; z-index:999; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+/* ══════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════ */
+.header {
+  position:sticky; top:0; z-index:100;
+  height:58px;
+  background:var(--dark);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px;
+}
+.hlogo {
+  display:flex; align-items:center; gap:10px;
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px; font-weight:700; color:var(--gold2);
+  letter-spacing:.02em;
+}
+.hlogo-icon { font-size:24px; }
+.hbadge {
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:var(--void); font-size:10px; font-weight:700;
+  padding:3px 10px; border-radius:20px; letter-spacing:.1em;
+}
+.hactions { display:flex; gap:8px; align-items:center; }
+
+/* ══════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════ */
+.app { display:grid; grid-template-columns:380px 1fr; height:calc(100vh - 58px); }
+
+/* ══════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════ */
+.sidebar {
+  background:var(--dark);
+  border-left:1px solid var(--border2);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.sidebar-tabs {
+  display:flex; border-bottom:1px solid var(--border2); flex-shrink:0;
+}
+.stab {
+  flex:1; padding:12px; text-align:center;
+  font-size:12px; font-weight:700; cursor:pointer;
+  color:var(--text3); transition:all .15s;
+  border-bottom:2px solid transparent;
+}
+.stab.active { color:var(--gold); border-bottom-color:var(--gold); }
+.stab:hover:not(.active) { color:var(--text2); }
+
+.sidebar-body { overflow-y:auto; flex:1; padding:20px; }
+.sidebar-body::-webkit-scrollbar { width:3px; }
+
+.sidebar-footer { padding:16px 20px; border-top:1px solid var(--border2); background:var(--panel); flex-shrink:0; }
+
+/* Tab panels */
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation:fadeIn .2s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── FORM ELEMENTS ── */
+.fsec { margin-bottom:22px; }
+.fsec-title {
+  font-size:10px; font-weight:700; letter-spacing:.12em;
+  color:var(--gold); text-transform:uppercase;
+  margin-bottom:12px; padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:6px;
+}
+.field { margin-bottom:12px; }
+.field label {
+  display:block; font-size:11px; font-weight:600;
+  color:var(--text3); margin-bottom:5px; letter-spacing:.04em;
+}
+.input {
+  width:100%; background:var(--card); border:1px solid var(--border2);
+  border-radius:var(--r2); padding:9px 13px;
+  color:var(--text); font-family:'Cairo',sans-serif; font-size:13px;
+  outline:none; transition:border-color .15s;
+  direction:rtl; text-align:right;
+}
+.input:focus { border-color:var(--gold); }
+.input::placeholder { color:var(--text3); }
+textarea.input { min-height:80px; resize:vertical; }
+select.input {
+  appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23575d70'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:left 11px center;
+  padding-left:28px;
+}
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* ── CHIPS ── */
+.chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.chip {
+  padding:4px 11px; border-radius:20px; border:1px solid var(--border2);
+  font-size:11px; font-weight:600; cursor:pointer;
+  transition:all .15s; color:var(--text3); background:var(--card);
+  font-family:'Cairo',sans-serif;
+}
+.chip:hover { border-color:var(--gold); color:var(--gold2); }
+.chip.on { background:rgba(201,168,76,.15); border-color:var(--gold); color:var(--gold2); }
+
+/* ── API KEY ── */
+.api-box {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px; margin-bottom:18px;
+}
+.api-box-title { font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--gold); margin-bottom:8px; }
+.api-row { position:relative; }
+.api-input {
+  width:100%; background:var(--panel); border:1px solid var(--border2);
+  border-radius:var(--r2); padding:9px 36px 9px 13px;
+  color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px;
+  outline:none; transition:border-color .15s; direction:ltr; text-align:left;
+}
+.api-input:focus { border-color:var(--gold); }
+.api-eye {
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--text3); cursor:pointer; font-size:15px;
+}
+.api-note { font-size:10px; color:var(--text3); margin-top:6px; line-height:1.6; }
+.api-note a { color:var(--gold); }
+
+/* ── FEATURE TOGGLE ── */
+.feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+.feat-item {
+  background:var(--card); border:1px solid var(--border2);
+  border-radius:var(--r2); padding:10px 12px;
+  cursor:pointer; transition:all .2s; display:flex;
+  align-items:center; gap:8px;
+}
+.feat-item.on { background:rgba(201,168,76,.08); border-color:var(--border); }
+.feat-item:hover { border-color:rgba(201,168,76,.3); }
+.feat-icon { font-size:18px; flex-shrink:0; }
+.feat-label { font-size:11px; font-weight:700; color:var(--text2); }
+.feat-sub { font-size:10px; color:var(--text3); }
+.feat-check { margin-right:auto; width:14px; height:14px; border-radius:50%; background:var(--border2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:9px; transition:all .2s; }
+.feat-item.on .feat-check { background:var(--gold); color:var(--void); }
+
+/* ── GENERATE BUTTON ── */
+.gen-btn {
+  width:100%; padding:14px; border:none; border-radius:var(--r);
+  background:linear-gradient(135deg,#7a5c1e,var(--gold),var(--gold2),#7a5c1e);
+  background-size:300% 100%; background-position:100% 0;
+  color:var(--void); font-family:'Cairo',sans-serif;
+  font-size:14px; font-weight:700; cursor:pointer;
+  transition:all .4s ease; display:flex;
+  align-items:center; justify-content:center; gap:8px;
+  letter-spacing:.03em;
+}
+.gen-btn:hover:not(:disabled) { background-position:0% 0; box-shadow:0 0 30px rgba(201,168,76,.3); }
+.gen-btn:disabled { opacity:.5; cursor:not-allowed; }
+.gen-btn .sp { width:18px; height:18px; border:2px solid rgba(8,9,12,.3); border-top-color:var(--void); border-radius:50%; animation:spin 1s linear infinite; display:none; }
+.gen-btn.busy .sp { display:block; }
+.gen-btn.busy .bt { display:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ══════════════════════════════════════════
+   PREVIEW PANE
+══════════════════════════════════════════ */
+.preview {
+  background:#c8c2b8;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.preview-bar {
+  background:var(--dark); border-bottom:1px solid var(--border);
+  padding:10px 18px; display:flex;
+  align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+.preview-bar-title { font-size:13px; font-weight:600; color:var(--gold2); }
+.pbar-actions { display:flex; gap:6px; }
+.pbtn {
+  background:rgba(255,255,255,.06); border:1px solid var(--border2);
+  color:var(--text2); padding:6px 14px; border-radius:6px;
+  font-size:12px; font-weight:600; cursor:pointer;
+  font-family:'Cairo',sans-serif; transition:all .15s;
+  display:flex; align-items:center; gap:5px;
+}
+.pbtn:hover { background:rgba(255,255,255,.12); color:var(--text); }
+.pbtn.gold { background:var(--gold); color:var(--void); border-color:var(--gold); }
+.pbtn.gold:hover { background:var(--gold2); }
+
+/* ── STATUS BAR ── */
+.status-bar {
+  background:var(--dark); border-bottom:1px solid var(--border2);
+  padding:8px 18px; display:flex; align-items:center; gap:10px;
+  flex-shrink:0;
+}
+.sdot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--text3); }
+.sdot.busy { background:var(--gold); animation:pulse .7s infinite; }
+.sdot.done { background:var(--jade2); }
+.sdot.err { background:var(--crimson); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.sbar { flex:1; background:var(--panel); border-radius:4px; height:3px; overflow:hidden; }
+.sfill { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold2)); border-radius:4px; transition:width .8s ease; width:0; }
+.stext { font-size:11px; font-weight:600; color:var(--text2); white-space:nowrap; }
+
+/* ── SCROLL AREA ── */
+.preview-scroll { flex:1; overflow-y:auto; padding:32px 24px; }
+.preview-scroll::-webkit-scrollbar { width:5px; }
+.preview-scroll::-webkit-scrollbar-thumb { background:rgba(0,0,0,.3); border-radius:4px; }
+
+/* ── EMPTY STATE ── */
+.empty {
+  height:100%; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  text-align:center; padding:40px;
+}
+.empty-icon { font-size:64px; margin-bottom:20px; opacity:.3; }
+.empty-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px; font-weight:600; color:var(--void);
+  opacity:.4; margin-bottom:10px;
+}
+.empty-sub { font-size:13px; color:rgba(0,0,0,.35); max-width:360px; line-height:1.7; }
+.empty-features {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:10px; max-width:400px; margin-top:24px;
+}
+.ef {
+  background:rgba(0,0,0,.08); border-radius:10px;
+  padding:12px 14px; text-align:center;
+}
+.ef-icon { font-size:22px; margin-bottom:5px; }
+.ef-label { font-size:11px; font-weight:700; color:rgba(0,0,0,.5); }
+
+/* ══════════════════════════════════════════
+   BOOK PAGES
+══════════════════════════════════════════ */
+.book-wrap {
+  display:flex; flex-direction:column;
+  align-items:center; gap:28px;
+  animation:fadeIn .4s ease;
+}
+
+.page {
+  background:#fff; width:100%; max-width:620px;
+  min-height:800px; position:relative;
+  border-radius:3px; overflow:hidden;
+  box-shadow:0 6px 30px rgba(0,0,0,.35),0 1px 4px rgba(0,0,0,.2);
+  padding:64px 60px 80px;
+  page-break-after:always;
+}
+
+/* Spine shadow */
+.page::before {
+  content:''; position:absolute;
+  top:0; right:0; bottom:0; width:18px;
+  background:linear-gradient(to left,rgba(0,0,0,.07),transparent);
+  pointer-events:none;
+}
+
+/* ── COVER PAGE ── */
+.page.cover {
+  background:linear-gradient(160deg,#0d0d10 0%,#111418 50%,#0a0c0f 100%);
+  color:#edeae2; padding:0; display:flex;
+  flex-direction:column; min-height:820px;
+}
+.cover-inner {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:60px 56px; text-align:center;
+  position:relative; z-index:1;
+}
+.cover-bg {
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 40%,rgba(201,168,76,.06) 0%,transparent 65%);
+  z-index:0;
+}
+.cover-corners::before,.cover-corners::after {
+  content:''; position:absolute; width:60px; height:60px;
+  border-color:rgba(201,168,76,.25); border-style:solid;
+}
+.cover-corners::before { top:24px; right:24px; border-width:1px 1px 0 0; }
+.cover-corners::after { bottom:24px; left:24px; border-width:0 0 1px 1px; }
+.cover-ornament { font-size:10px; letter-spacing:.3em; color:var(--gold); text-transform:uppercase; margin-bottom:28px; }
+.cover-divider { width:60px; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:20px auto; }
+.cover-line2 { width:100px; height:1px; background:linear-gradient(90deg,transparent,rgba(201,168,76,.4),transparent); margin:12px auto 28px; }
+.cover-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:40px; font-weight:700; line-height:1.15;
+  letter-spacing:-.01em; color:#f0ece2;
+  margin-bottom:14px; max-width:440px;
+}
+.cover-subtitle { font-size:15px; color:rgba(237,234,226,.55); max-width:360px; line-height:1.65; margin-bottom:28px; }
+.cover-author-box { margin-top:16px; }
+.cover-by { font-size:10px; letter-spacing:.2em; color:rgba(201,168,76,.6); margin-bottom:5px; text-transform:uppercase; }
+.cover-author { font-family:'Cormorant Garamond',serif; font-size:20px; color:rgba(237,234,226,.8); }
+.cover-year { position:absolute; bottom:28px; left:50%; transform:translateX(-50%); font-size:10px; letter-spacing:.2em; color:rgba(201,168,76,.4); }
+
+/* ── PAGE ELEMENTS ── */
+.pg-chapter-label { font-size:10px; font-weight:700; letter-spacing:.2em; color:var(--gold); text-transform:uppercase; margin-bottom:8px; }
+.pg-chapter-num { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text3); }
+.pg-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:30px; font-weight:700; line-height:1.2;
+  color:#1a1714; margin-bottom:8px; letter-spacing:-.02em;
+}
+.pg-rule { width:40px; height:2px; background:var(--gold); margin-bottom:24px; }
+.pg-intro {
+  font-size:14.5px; color:#5a5550; font-style:italic;
+  border-right:3px solid rgba(201,168,76,.3);
+  padding-right:14px; margin-bottom:24px;
+  line-height:1.85; font-family:'Cormorant Garamond',serif;
+}
+
+/* Body text */
+.pg-body { font-size:13.5px; color:#2a2520; line-height:1.95; margin-bottom:16px; text-align:justify; }
+.pg-body.dropcap::first-letter {
+  font-family:'Cormorant Garamond',serif; font-size:48px; font-weight:700;
+  color:var(--gold); float:right; margin-left:8px; margin-top:2px; line-height:.8;
+}
+.pg-h2 { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:#1a1714; margin:26px 0 10px; letter-spacing:-.01em; }
+.pg-h3 { font-size:14px; font-weight:700; color:#2d5a3d; margin:18px 0 8px; letter-spacing:.02em; }
+
+/* Section ornament */
+.pg-ornament { text-align:center; color:rgba(201,168,76,.5); font-size:14px; letter-spacing:.3em; margin:24px 0; }
+
+/* Page footer */
+.pg-footer { position:absolute; bottom:0; left:0; right:0; padding:20px 60px; display:flex; align-items:center; justify-content:space-between; }
+.pg-footer-rule { position:absolute; top:0; left:60px; right:60px; height:1px; background:rgba(0,0,0,.08); }
+.pg-page-num { font-family:'JetBrains Mono',monospace; font-size:10px; color:#b0a898; }
+.pg-running-head { font-size:10px; color:#b0a898; letter-spacing:.06em; }
+
+/* ── IMAGE BLOCK ── */
+.img-block {
+  margin:22px 0; border-radius:var(--r2); overflow:hidden;
+  box-shadow:0 4px 16px rgba(0,0,0,.12);
+}
+.img-block img { width:100%; display:block; object-fit:cover; max-height:280px; }
+.img-caption {
+  background:#f7f5f0; padding:8px 14px;
+  font-size:11px; color:#7a7570; font-style:italic; text-align:center;
+  border-top:1px solid rgba(0,0,0,.06);
+}
+
+/* ── TABLE ── */
+.pg-table { width:100%; border-collapse:collapse; margin:20px 0; font-size:13px; }
+.pg-table thead tr { background:#1a1714; color:#e2c97e; }
+.pg-table th { padding:10px 14px; text-align:right; font-weight:700; font-size:12px; letter-spacing:.04em; }
+.pg-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.07); color:#2a2520; line-height:1.5; }
+.pg-table tbody tr:nth-child(even) { background:#f9f7f3; }
+.pg-table tbody tr:hover { background:#f2efe8; }
+.table-title { font-size:12px; font-weight:700; color:#5a5550; margin-bottom:6px; letter-spacing:.04em; text-align:center; }
+
+/* ── CALLOUT ── */
+.callout {
+  margin:20px 0; border-radius:0 var(--r) var(--r) 0;
+  border-right:4px solid var(--gold); background:#faf7ef;
+  padding:16px 18px;
+}
+.callout.jade { border-right-color:#2d6a4f; background:#f0f7f2; }
+.callout.sky { border-right-color:#2d6fa8; background:#f0f5fa; }
+.callout.crimson { border-right-color:#8b1a1a; background:#faf0f0; }
+.callout-title { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; color:var(--gold); }
+.callout.jade .callout-title { color:#2d6a4f; }
+.callout.sky .callout-title { color:#2d6fa8; }
+.callout.crimson .callout-title { color:#8b1a1a; }
+.callout-body { font-size:13px; color:#3a3530; line-height:1.8; }
+
+/* ── STYLED LIST ── */
+.styled-list { list-style:none; margin:14px 0; padding:0; }
+.styled-list li {
+  font-size:13.5px; color:#2a2520; padding:7px 26px 7px 0;
+  border-bottom:1px solid rgba(0,0,0,.05); position:relative; line-height:1.7;
+}
+.styled-list li:last-child { border-bottom:none; }
+.styled-list li::before { content:'◆'; position:absolute; right:0; color:var(--gold); font-size:9px; top:11px; }
+
+.num-list { counter-reset:nl; list-style:none; margin:14px 0; padding:0; }
+.num-list li {
+  font-size:13.5px; color:#2a2520; padding:8px 34px 8px 0;
+  position:relative; line-height:1.7; border-bottom:1px solid rgba(0,0,0,.05);
+}
+.num-list li:last-child { border-bottom:none; }
+.num-list li::before {
+  counter-increment:nl; content:counter(nl);
+  position:absolute; right:0; top:8px;
+  width:22px; height:22px; background:#1a1714; color:#e2c97e;
+  border-radius:50%; font-size:10px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono',monospace;
+}
+
+/* ── CHECKLIST ── */
+.check-list { list-style:none; margin:14px 0; padding:0; }
+.check-list li { font-size:13.5px; color:#2a2520; padding:7px 30px 7px 0; position:relative; line-height:1.7; }
+.check-list li::before { content:'☐'; position:absolute; right:0; font-size:16px; color:#ccc; top:7px; }
+
+/* ── QUOTE ── */
+.pg-quote {
+  font-family:'Cormorant Garamond',serif; font-style:italic;
+  font-size:20px; color:#2d5a3d; text-align:center;
+  padding:24px 32px; margin:24px 0; position:relative;
+  border-top:1px solid rgba(0,0,0,.08); border-bottom:1px solid rgba(0,0,0,.08);
+  line-height:1.6;
+}
+.pg-quote::before { content:'\201C'; font-size:72px; color:rgba(201,168,76,.15); position:absolute; top:-16px; right:16px; line-height:1; font-family:'Cormorant Garamond',serif; }
+
+/* ── TIP BOX ── */
+.tip-box { background:linear-gradient(135deg,#fffdf5,#faf7ec); border:1px solid rgba(201,168,76,.2); border-radius:var(--r); padding:18px 20px; margin:20px 0; }
+.tip-box-hd { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:var(--gold); margin-bottom:10px; letter-spacing:.05em; text-transform:uppercase; }
+.tip-item { font-size:13px; color:#3a3530; padding:5px 0; line-height:1.7; border-bottom:1px dashed rgba(0,0,0,.07); }
+.tip-item:last-child { border-bottom:none; }
+.tip-item strong { color:#1a1714; }
+
+/* ── EXERCISE ── */
+.exercise { background:#f0f7f2; border:1px solid rgba(45,106,79,.2); border-radius:var(--r); padding:18px 20px; margin:20px 0; }
+.exercise-hd { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#2d6a4f; margin-bottom:10px; letter-spacing:.05em; text-transform:uppercase; }
+.exercise-body { font-size:13px; color:#2a3a30; line-height:1.8; }
+
+/* ── DATA CALLOUT (stat boxes) ── */
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0; }
+.stat-box { background:#f9f7f3; border:1px solid rgba(0,0,0,.07); border-radius:var(--r2); padding:16px; text-align:center; }
+.stat-num { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:700; color:#1a1714; line-height:1; }
+.stat-unit { font-size:11px; color:var(--gold); font-weight:700; margin-bottom:4px; }
+.stat-label { font-size:11px; color:#8a8580; line-height:1.4; }
+
+/* ── CHART WRAPPER ── */
+.chart-wrap { margin:20px 0; background:#faf8f4; border:1px solid rgba(0,0,0,.07); border-radius:var(--r); padding:18px; }
+.chart-title { font-size:12px; font-weight:700; color:#5a5550; margin-bottom:12px; text-align:center; letter-spacing:.04em; }
+.chart-canvas-wrap { height:220px; position:relative; }
+
+/* ── AUTHOR BOX ── */
+.author-box { background:#f9f7f3; border-radius:var(--r); padding:22px; display:flex; gap:16px; align-items:flex-start; margin:20px 0; }
+.author-ava { width:60px; height:60px; background:#1a1714; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+.author-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:#1a1714; margin-bottom:4px; }
+.author-bio { font-size:13px; color:#5a5550; line-height:1.7; }
+
+/* ── COPYRIGHT PAGE ── */
+.copyright-text { font-size:11px; color:#8a8580; line-height:2; border-top:1px solid rgba(0,0,0,.08); padding-top:20px; }
+
+/* ── TOC ── */
+.toc-title { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:700; color:#1a1714; margin-bottom:6px; }
+.toc-rule { width:48px; height:2px; background:var(--gold); margin-bottom:28px; }
+.toc-item { display:flex; align-items:baseline; gap:8px; padding:9px 0; border-bottom:1px dotted rgba(0,0,0,.1); }
+.toc-num { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); min-width:26px; font-weight:500; }
+.toc-ch { font-size:13.5px; font-weight:600; color:#1a1714; flex:1; }
+.toc-sub { font-size:11px; color:#8a8580; }
+.toc-pg { font-family:'JetBrains Mono',monospace; font-size:10px; color:#b0a898; flex-shrink:0; }
+
+/* ── WEB DATA BADGE ── */
+.web-badge { display:inline-flex; align-items:center; gap:5px; background:rgba(45,111,168,.08); border:1px solid rgba(45,111,168,.2); border-radius:20px; padding:3px 10px; font-size:10px; color:#2d6fa8; font-weight:600; margin-right:6px; }
+
+/* ══════════════════════════════════════════
+   STATS SIDEBAR
+══════════════════════════════════════════ */
+.stats-panel { padding:16px 20px; }
+.stat-card { background:var(--card); border:1px solid var(--border2); border-radius:var(--r2); padding:14px; margin-bottom:10px; }
+.sc-label { font-size:10px; font-weight:700; letter-spacing:.08em; color:var(--text3); text-transform:uppercase; margin-bottom:4px; }
+.sc-val { font-size:22px; font-weight:700; color:var(--gold2); font-family:'Cormorant Garamond',serif; }
+.sc-sub { font-size:10px; color:var(--text3); margin-top:2px; }
+.mini-prog { height:3px; background:var(--panel); border-radius:3px; margin-top:8px; overflow:hidden; }
+.mini-prog-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold2)); border-radius:3px; }
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+.toast {
+  position:fixed; bottom:24px; right:24px;
+  background:var(--dark); color:var(--gold2);
+  border:1px solid var(--border); border-radius:var(--r);
+  padding:12px 20px; font-size:13px; font-weight:600;
+  font-family:'Cairo',sans-serif; z-index:200;
+  transform:translateY(80px); opacity:0;
+  transition:all .3s cubic-bezier(.4,0,.2,1);
+}
+.toast.show { transform:translateY(0); opacity:1; }
+
+/* ══════════════════════════════════════════
+   PRINT
+══════════════════════════════════════════ */
+@media print {
+  .header,.sidebar,.preview-bar,.status-bar,.tool-btn,.pbtn,.pg-footer-rule { display:none!important; }
+  .app { display:block; }
+  .preview { overflow:visible; background:#fff; }
+  .preview-scroll { overflow:visible; padding:0; }
+  .book-wrap { padding:0; gap:0; }
+  .page { box-shadow:none; border:none; max-width:100%; border-radius:0; page-break-after:always; break-after:page; min-height:0; }
+  body::after { display:none; }
+  .cover { min-height:842px; }
+}
+
+@media (max-width:860px) {
+  .app { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .sidebar { max-height:45vh; }
+  .page { padding:40px 30px 70px; }
+  .preview-scroll { padding:20px 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="header">
+  <div class="hlogo">
+    <span class="hlogo-icon">📚</span>
+    KDP Pro Publisher
+  </div>
+  <div class="hactions">
+    <span class="hbadge">AI BOOK GENERATOR v2</span>
+  </div>
+</header>
+
+<div class="app">
+
+<!-- ══════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════ -->
+<aside class="sidebar">
+
+  <!-- Tab headers -->
+  <div class="sidebar-tabs">
+    <div class="stab active" onclick="showTab('config',this)">⚙️ الإعداد</div>
+    <div class="stab" onclick="showTab('features',this)">✨ المميزات</div>
+    <div class="stab" onclick="showTab('stats',this)">📊 الإحصاء</div>
+  </div>
+
+  <!-- ── CONFIG TAB ── -->
+  <div class="sidebar-body tab-panel active" id="tab-config">
+
+    <!-- API Key -->
+    <div class="api-box">
+      <div class="api-box-title">🔑 مفتاح Claude API</div>
+      <div class="api-row">
+        <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api03-...">
+        <button class="api-eye" onclick="toggleVis()" id="apiEye">👁</button>
+      </div>
+      <div class="api-note">احصل على مفتاحك من <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> · يُحفظ في متصفحك فقط</div>
+    </div>
+
+    <!-- Book Info -->
+    <div class="fsec">
+      <div class="fsec-title">📖 معلومات الكتاب</div>
+      <div class="field">
+        <label>الموضوع الرئيسي *</label>
+        <input class="input" id="topic" placeholder="مثال: الذكاء الاصطناعي في التعليم">
+      </div>
+      <div class="field">
+        <label>المجال / النيش</label>
+        <input class="input" id="niche" placeholder="مثال: تطوير الذات، الأعمال، الصحة">
+      </div>
+      <div class="field">
+        <label>عنوان الكتاب (اختياري — سيُولَّد تلقائياً)</label>
+        <input class="input" id="title" placeholder="اتركه فارغاً للتوليد التلقائي">
+      </div>
+      <div class="field">
+        <label>اسم المؤلف</label>
+        <input class="input" id="author" placeholder="اسمك أو قلم مستعار">
+      </div>
+    </div>
+
+    <!-- Book Type -->
+    <div class="fsec">
+      <div class="fsec-title">📂 نوع الكتاب</div>
+      <div class="chips" id="typeChips">
+        <div class="chip on" data-v="Educational">تعليمي</div>
+        <div class="chip" data-v="Self-help">تطوير ذات</div>
+        <div class="chip" data-v="Business">أعمال</div>
+        <div class="chip" data-v="Guide">دليل عملي</div>
+        <div class="chip" data-v="Workbook">كتاب عمل</div>
+        <div class="chip" data-v="Health">صحة</div>
+        <div class="chip" data-v="Cookbook">طبخ</div>
+        <div class="chip" data-v="Children">أطفال</div>
+        <div class="chip" data-v="Marketing">تسويق</div>
+        <div class="chip" data-v="Lifestyle">أسلوب حياة</div>
+        <div class="chip" data-v="Finance">مالية</div>
+        <div class="chip" data-v="Science">علوم</div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="fsec">
+      <div class="fsec-title">🎛 الإعدادات</div>
+      <div class="grid2">
+        <div class="field">
+          <label>الجمهور</label>
+          <select class="input" id="audience">
+            <option value="مبتدئين">مبتدئون</option>
+            <option value="متوسط" selected>متوسط</option>
+            <option value="متقدم">متقدم</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>اللغة</label>
+          <select class="input" id="lang">
+            <option value="Arabic">عربي 🇸🇦</option>
+            <option value="English">English 🇬🇧</option>
+            <option value="French">Français 🇫🇷</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>النبرة</label>
+          <select class="input" id="tone">
+            <option value="احترافي">احترافي</option>
+            <option value="ودود">ودود</option>
+            <option value="تحفيزي">تحفيزي</option>
+            <option value="أكاديمي">أكاديمي</option>
+            <option value="محادثة">محادثة</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>عدد الفصول</label>
+          <select class="input" id="chapters">
+            <option value="5">5 فصول</option>
+            <option value="7" selected>7 فصول</option>
+            <option value="10">10 فصول</option>
+            <option value="12">12 فصلاً</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="fsec">
+      <div class="fsec-title">💬 توجيهات خاصة</div>
+      <div class="field">
+        <textarea class="input" id="notes" placeholder="مثال: أضف أمثلة عربية، ركّز على الجانب العملي، استخدم إحصائيات حديثة..."></textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── FEATURES TAB ── -->
+  <div class="sidebar-body tab-panel" id="tab-features">
+    <div class="fsec">
+      <div class="fsec-title">🖼 الصور والمرئيات</div>
+      <div class="feat-grid">
+        <div class="feat-item on" id="feat-images" onclick="toggleFeat(this)">
+          <div class="feat-icon">🖼</div>
+          <div><div class="feat-label">صور Unsplash</div><div class="feat-sub">صور مجانية تلقائية</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-charts" onclick="toggleFeat(this)">
+          <div class="feat-icon">📊</div>
+          <div><div class="feat-label">رسوم بيانية</div><div class="feat-sub">Chart.js تفاعلي</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-tables" onclick="toggleFeat(this)">
+          <div class="feat-icon">📋</div>
+          <div><div class="feat-label">جداول بيانات</div><div class="feat-sub">جداول منسّقة</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-stats" onclick="toggleFeat(this)">
+          <div class="feat-icon">🔢</div>
+          <div><div class="feat-label">بطاقات إحصاء</div><div class="feat-sub">أرقام بارزة</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fsec">
+      <div class="fsec-title">📝 محتوى الكتاب</div>
+      <div class="feat-grid">
+        <div class="feat-item on" id="feat-tips" onclick="toggleFeat(this)">
+          <div class="feat-icon">💡</div>
+          <div><div class="feat-label">نصائح ذهبية</div><div class="feat-sub">5 نصائح/فصل</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-checklist" onclick="toggleFeat(this)">
+          <div class="feat-icon">☑</div>
+          <div><div class="feat-label">قوائم تحقق</div><div class="feat-sub">قابلة للطباعة</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-exercise" onclick="toggleFeat(this)">
+          <div class="feat-icon">🎯</div>
+          <div><div class="feat-label">تمارين عملية</div><div class="feat-sub">نشاط لكل فصل</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-quotes" onclick="toggleFeat(this)">
+          <div class="feat-icon">💬</div>
+          <div><div class="feat-label">اقتباسات</div><div class="feat-sub">من مفكرين عالميين</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item" id="feat-casestudy" onclick="toggleFeat(this)">
+          <div class="feat-icon">🔍</div>
+          <div><div class="feat-label">دراسات حالة</div><div class="feat-sub">أمثلة واقعية</div></div>
+          <div class="feat-check"></div>
+        </div>
+        <div class="feat-item" id="feat-glossary" onclick="toggleFeat(this)">
+          <div class="feat-icon">📖</div>
+          <div><div class="feat-label">مسرد مصطلحات</div><div class="feat-sub">في نهاية الكتاب</div></div>
+          <div class="feat-check"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fsec">
+      <div class="fsec-title">🎨 التصميم</div>
+      <div class="feat-grid">
+        <div class="feat-item on" id="feat-dropcap" onclick="toggleFeat(this)">
+          <div class="feat-icon">🔤</div>
+          <div><div class="feat-label">حرف مكبّر</div><div class="feat-sub">بداية الفصول</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+        <div class="feat-item on" id="feat-ornaments" onclick="toggleFeat(this)">
+          <div class="feat-icon">✦</div>
+          <div><div class="feat-label">فواصل زخرفية</div><div class="feat-sub">بين الأقسام</div></div>
+          <div class="feat-check">✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATS TAB ── -->
+  <div class="sidebar-body tab-panel" id="tab-stats">
+    <div class="stats-panel">
+      <div class="stat-card">
+        <div class="sc-label">الكلمات</div>
+        <div class="sc-val" id="sc-words">0</div>
+        <div class="sc-sub">كلمة في الكتاب</div>
+        <div class="mini-prog"><div class="mini-prog-fill" id="sc-words-bar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">الصفحات</div>
+        <div class="sc-val" id="sc-pages">0</div>
+        <div class="sc-sub">صفحة مقدّرة للطباعة</div>
+        <div class="mini-prog"><div class="mini-prog-fill" id="sc-pages-bar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">الفصول</div>
+        <div class="sc-val" id="sc-chapters">0</div>
+        <div class="sc-sub">فصل مكتمل</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">الصور</div>
+        <div class="sc-val" id="sc-images">0</div>
+        <div class="sc-sub">صورة تلقائية</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">الجداول</div>
+        <div class="sc-val" id="sc-tables">0</div>
+        <div class="sc-sub">جدول بيانات</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">الرسوم البيانية</div>
+        <div class="sc-val" id="sc-charts">0</div>
+        <div class="sc-sub">رسم بياني تفاعلي</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">تكلفة التوليد</div>
+        <div class="sc-val" id="sc-cost">~$0.00</div>
+        <div class="sc-sub">تقريبية بالدولار</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer with generate button -->
+  <div class="sidebar-footer">
+    <button class="gen-btn" id="genBtn" onclick="generateBook()">
+      <div class="sp" id="bsp"></div>
+      <span class="bt">✨ توليد الكتاب الكامل</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════
+   PREVIEW PANE
+══════════════════════════════════════ -->
+<main class="preview">
+
+  <div class="preview-bar">
+    <span class="preview-bar-title" id="previewTitle">📚 معاينة الكتاب</span>
+    <div class="pbar-actions">
+      <button class="pbtn" id="copyBtn" style="display:none" onclick="copyBook()">📋 نسخ</button>
+      <button class="pbtn" id="printBtn" style="display:none" onclick="window.print()">🖨 طباعة / PDF</button>
+      <button class="pbtn gold" id="exportBtn" style="display:none" onclick="exportBook()">⬇ تصدير HTML</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="sdot" id="sdot"></div>
+    <div class="sbar"><div class="sfill" id="sfill"></div></div>
+    <span class="stext" id="stext">جاهز للتوليد</span>
+  </div>
+
+  <div class="preview-scroll" id="previewScroll">
+
+    <!-- Empty State -->
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">📚</div>
+      <div class="empty-title">KDP Pro Publisher</div>
+      <div class="empty-sub">مولّد الكتب الاحترافي بالذكاء الاصطناعي مع صور ورسوم بيانية وجداول بيانات</div>
+      <div class="empty-features">
+        <div class="ef"><div class="ef-icon">🖼</div><div class="ef-label">صور تلقائية</div></div>
+        <div class="ef"><div class="ef-icon">📊</div><div class="ef-label">رسوم بيانية</div></div>
+        <div class="ef"><div class="ef-icon">📋</div><div class="ef-label">جداول بيانات</div></div>
+        <div class="ef"><div class="ef-icon">🌍</div><div class="ef-label">3 لغات</div></div>
+      </div>
+    </div>
+
+    <!-- Book Output -->
+    <div class="book-wrap" id="bookWrap" style="display:none"></div>
+
+  </div>
+</main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════════
+//  GLOBALS
+// ══════════════════════════════════════════════════════════════
+let totalWords = 0, totalImages = 0, totalTables = 0, totalCharts = 0;
+let pageCounter = 1;
+let chartInstances = [];
+
+// ══════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function showTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+function initChips() {
+  document.querySelectorAll('.chips').forEach(g => {
+    g.querySelectorAll('.chip').forEach(c => {
+      c.addEventListener('click', () => {
+        g.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+        c.classList.add('on');
+      });
+    });
+  });
+}
+
+function toggleFeat(el) {
+  el.classList.toggle('on');
+  el.querySelector('.feat-check').textContent = el.classList.contains('on') ? '✓' : '';
+}
+
+function isFeat(id) { return document.getElementById(id)?.classList.contains('on'); }
+
+function toggleVis() {
+  const inp = document.getElementById('apiKey');
+  const eye = document.getElementById('apiEye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  eye.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function toast(msg, dur = 3500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setStatus(text, state = 'idle', pct = 0) {
+  document.getElementById('stext').textContent = text;
+  const d = document.getElementById('sdot');
+  d.className = 'sdot ' + state;
+  document.getElementById('sfill').style.width = pct + '%';
+}
+
+function setBusy(busy) {
+  const btn = document.getElementById('genBtn');
+  btn.disabled = busy;
+  btn.classList.toggle('busy', busy);
+}
+
+function updateStats() {
+  const pages = Math.max(pageCounter - 1, 1);
+  document.getElementById('sc-words').textContent = totalWords.toLocaleString();
+  document.getElementById('sc-pages').textContent = pages;
+  document.getElementById('sc-chapters').textContent = document.getElementById('chapters').value;
+  document.getElementById('sc-images').textContent = totalImages;
+  document.getElementById('sc-tables').textContent = totalTables;
+  document.getElementById('sc-charts').textContent = totalCharts;
+  const cost = ((totalWords / 1000) * 0.003).toFixed(3);
+  document.getElementById('sc-cost').textContent = '~$' + cost;
+  document.getElementById('sc-words-bar').style.width = Math.min(100, totalWords / 80) + '%';
+  document.getElementById('sc-pages-bar').style.width = Math.min(100, pages / 1.5) + '%';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  API
+// ══════════════════════════════════════════════════════════════
+function getKey() {
+  const v = document.getElementById('apiKey').value.trim() || localStorage.getItem('kdp_pro_key') || '';
+  if (v) localStorage.setItem('kdp_pro_key', v);
+  return v;
+}
+
+async function ai(prompt, maxTok = 4000) {
+  const key = getKey();
+  if (!key) throw new Error('أدخل مفتاح API أولاً');
+  const body = JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] });
+  const hdrs = { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+  const urls = [
+    'https://api.anthropic.com/v1/messages',
+    'https://corsproxy.io/?https://api.anthropic.com/v1/messages',
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'),
+  ];
+  let lastErr;
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: hdrs, body });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
+      const d = await r.json();
+      totalWords += (d.content[0]?.text || '').split(/\s+/).length;
+      return d.content.map(b => b.text || '').join('');
+    } catch(e) { lastErr = e; continue; }
+  }
+  throw lastErr || new Error('تعذّر الاتصال بالـ API');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UNSPLASH IMAGE (free, no key needed via source.unsplash.com)
+// ══════════════════════════════════════════════════════════════
+function getImageUrl(query, w = 900, h = 500) {
+  const q = encodeURIComponent(query);
+  return `https://source.unsplash.com/${w}x${h}/?${q}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHART CREATION
+// ══════════════════════════════════════════════════════════════
+function createChart(canvasId, type, labels, data, label, colors) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  const palette = colors || ['#c9a84c','#2d6a4f','#2d6fa8','#8b1a1a','#5a4a8a','#6a4a2a'];
+  if (type === 'bar' || type === 'line') {
+    new Chart(ctx, {
+      type,
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          backgroundColor: type === 'bar' ? palette.map(c => c + '99') : palette[0] + '33',
+          borderColor: type === 'bar' ? palette : palette[0],
+          borderWidth: 2,
+          borderRadius: type === 'bar' ? 6 : 0,
+          fill: type === 'line',
+          tension: .4,
+          pointRadius: 4,
+          pointBackgroundColor: palette[0],
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { family: "'Cairo'" } } },
+          x: { grid: { display: false }, ticks: { font: { family: "'Cairo'" } } }
+        }
+      }
+    });
+  } else if (type === 'doughnut' || type === 'pie') {
+    new Chart(ctx, {
+      type,
+      data: { labels, datasets: [{ data, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: "'Cairo'", size: 11 } } } }
+      }
+    });
+  }
+  totalCharts++;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PAGE FACTORY
+// ══════════════════════════════════════════════════════════════
+function makePage(html, cls = '') {
+  const wrap = document.getElementById('bookWrap');
+  const page = document.createElement('div');
+  page.className = 'page ' + cls;
+
+  if (cls !== 'cover') {
+    const n = pageCounter++;
+    html += `
+      <div class="pg-footer">
+        <div class="pg-footer-rule"></div>
+        <span class="pg-page-num">${n}</span>
+        <span class="pg-running-head" id="running-${n}"></span>
+      </div>`;
+  }
+
+  page.innerHTML = html;
+  wrap.appendChild(page);
+  return page;
+}
+
+function setRunningHead(text) {
+  // Set running head on last rendered page
+  const last = document.querySelectorAll('[id^="running-"]');
+  if (last.length > 0) last[last.length - 1].textContent = text;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TEXT FORMATTER
+// ══════════════════════════════════════════════════════════════
+function fmt(text, dropcap = false) {
+  if (!text) return '';
+  let html = text
+    .replace(/^###\s+(.+)$/gm, '<div class="pg-h3">$1</div>')
+    .replace(/^##\s+(.+)$/gm, '<div class="pg-h2">$1</div>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  const lines = html.split('\n');
+  const out = [];
+  let inUl = false, inOl = false, ulHtml = '', olHtml = '';
+
+  function closeList() {
+    if (inUl) { out.push(ulHtml + '</ul>'); inUl = false; ulHtml = ''; }
+    if (inOl) { out.push(olHtml + '</ol>'); inOl = false; olHtml = ''; }
+  }
+
+  lines.forEach((line, i) => {
+    const tr = line.trim();
+    if (!tr) { closeList(); return; }
+    if (tr.match(/^[-•*]\s+/)) {
+      if (!inUl) { closeList(); inUl = true; ulHtml = '<ul class="styled-list">'; }
+      ulHtml += `<li>${tr.replace(/^[-•*]\s+/, '')}</li>`;
+    } else if (tr.match(/^\d+\.\s+/)) {
+      if (!inOl) { closeList(); inOl = true; olHtml = '<ol class="num-list">'; }
+      olHtml += `<li>${tr.replace(/^\d+\.\s+/, '')}</li>`;
+    } else if (tr.startsWith('<div class="pg-h')) {
+      closeList(); out.push(tr);
+    } else {
+      closeList();
+      const cls = 'pg-body' + (i === 0 && dropcap ? ' dropcap' : '');
+      out.push(`<p class="${cls}">${tr}</p>`);
+    }
+  });
+  closeList();
+  return out.join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHAPTER PARSER
+// ══════════════════════════════════════════════════════════════
+function parseSection(raw, tag) {
+  const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)(?=\\[\\w+\\]|$)`, 'i');
+  const m = raw.match(re);
+  return m ? m[1].trim() : '';
+}
+
+function parseTips(raw) {
+  const sec = parseSection(raw, 'TIPS');
+  if (!sec) return [];
+  return sec.split('\n').filter(l => l.trim() && (l.includes(':') || l.match(/^[-•*\d]/))).map(l => {
+    const [head, ...rest] = l.replace(/^[-•*\d.]+\s*/, '').split(':');
+    return { t: head.trim(), b: rest.join(':').trim() };
+  }).filter(x => x.t);
+}
+
+function parseChecklist(raw) {
+  const sec = parseSection(raw, 'CHECKLIST');
+  if (!sec) return [];
+  return sec.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-•*☐☑\[\]\d.]+\s*/, '').trim()).filter(Boolean);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER CHAPTER
+// ══════════════════════════════════════════════════════════════
+function renderChapter(ch, num, topic, lang, featFlags) {
+  const raw = ch.content || '';
+  const intro = parseSection(raw, 'CHAPTER_INTRO');
+  let body = parseSection(raw, 'BODY');
+  if (!body) body = raw.replace(/\[\w+\][\s\S]*/i, '').trim();
+
+  const quote = (raw.match(/\[QUOTE\]([\s\S]*?)\[\/QUOTE\]/i) || [])[1]?.trim();
+  const tips = parseTips(raw);
+  const checklist = parseChecklist(raw);
+  const exercise = parseSection(raw, 'EXERCISE');
+  const caseStudy = parseSection(raw, 'CASE_STUDY');
+  const tableData = parseSection(raw, 'TABLE_DATA');
+  const chartData = parseSection(raw, 'CHART_DATA');
+  const statsData = parseSection(raw, 'STATS');
+
+  const isAr = lang === 'Arabic';
+  const chLabel = isAr ? 'الفصل' : 'Chapter';
+
+  let html = `
+    <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${String(num).padStart(2,'0')}</span></div>
+    <div class="pg-title">${esc(ch.title)}</div>
+    <div class="pg-rule"></div>
+    ${intro ? `<div class="pg-intro">${esc(intro)}</div>` : (ch.subtitle ? `<div class="pg-intro">${esc(ch.subtitle)}</div>` : '')}
+  `;
+
+  // Image
+  if (featFlags.images) {
+    const imgQuery = `${topic} ${ch.title}`;
+    const cid = 'img_' + num + '_' + Date.now();
+    html += `
+      <div class="img-block">
+        <img src="${getImageUrl(imgQuery)}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+        <div class="img-caption">${esc(ch.title)}</div>
+      </div>`;
+    totalImages++;
+  }
+
+  // Stat boxes
+  if (featFlags.stats && statsData) {
+    try {
+      const statsArr = statsData.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3);
+      if (statsArr.length >= 2) {
+        html += '<div class="stat-row">';
+        statsArr.forEach(s => {
+          const [num, unit, label] = s.split(',').map(x => x.trim());
+          html += `<div class="stat-box"><div class="stat-num">${esc(num)}</div><div class="stat-unit">${esc(unit)}</div><div class="stat-label">${esc(label)}</div></div>`;
+        });
+        html += '</div>';
+      }
+    } catch {}
+  }
+
+  // Body text
+  html += fmt(body, featFlags.dropcap);
+
+  // Quote
+  if (featFlags.quotes && quote) {
+    html += `<div class="pg-quote">${esc(quote)}</div>`;
+  }
+
+  // Ornament
+  if (featFlags.ornaments) {
+    html += `<div class="pg-ornament">— ✦ —</div>`;
+  }
+
+  // Chart
+  if (featFlags.charts && chartData) {
+    try {
+      let cd;
+      try { cd = JSON.parse(chartData.replace(/```json|```/g, '').trim()); } catch { cd = null; }
+      if (cd) {
+        const canvasId = 'chart_' + num + '_' + Date.now();
+        const chartTitle = cd.title || (isAr ? 'إحصاءات الفصل' : 'Chapter Statistics');
+        html += `
+          <div class="chart-wrap">
+            <div class="chart-title">${esc(chartTitle)}</div>
+            <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
+          </div>`;
+        // Create chart after render
+        setTimeout(() => createChart(canvasId, cd.type || 'bar', cd.labels || [], cd.data || [], cd.label || '', null), 200);
+      }
+    } catch {}
+  }
+
+  // Table
+  if (featFlags.tables && tableData) {
+    try {
+      let td;
+      try { td = JSON.parse(tableData.replace(/```json|```/g, '').trim()); } catch { td = null; }
+      if (td && td.headers && td.rows) {
+        const tLabel = td.title || (isAr ? 'جدول البيانات' : 'Data Table');
+        html += `
+          <div class="table-title">${esc(tLabel)}</div>
+          <table class="pg-table">
+            <thead><tr>${td.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+            <tbody>${td.rows.map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>`;
+        totalTables++;
+      }
+    } catch {}
+  }
+
+  // Tips
+  if (featFlags.tips && tips.length > 0) {
+    html += `<div class="tip-box"><div class="tip-box-hd">💡 ${isAr ? 'نصائح ذهبية' : 'Golden Tips'}</div>${tips.map(t => `<div class="tip-item"><strong>${esc(t.t)}</strong>: ${esc(t.b)}</div>`).join('')}</div>`;
+  }
+
+  // Checklist
+  if (featFlags.checklist && checklist.length > 0) {
+    html += `
+      <div class="callout jade">
+        <div class="callout-title">✅ ${isAr ? 'قائمة التحقق' : 'Action Checklist'}</div>
+        <div class="callout-body">
+          <ul class="check-list">${checklist.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+        </div>
+      </div>`;
+  }
+
+  // Case study
+  if (featFlags.casestudy && caseStudy) {
+    html += `
+      <div class="callout sky">
+        <div class="callout-title">🔍 ${isAr ? 'دراسة حالة' : 'Case Study'}</div>
+        <div class="callout-body">${esc(caseStudy)}</div>
+      </div>`;
+  }
+
+  // Exercise
+  if (featFlags.exercise && exercise) {
+    html += `
+      <div class="exercise">
+        <div class="exercise-hd">🎯 ${isAr ? 'تمرين عملي' : 'Practical Exercise'}</div>
+        <div class="exercise-body">${esc(exercise)}</div>
+      </div>`;
+  }
+
+  makePage(html);
+  setRunningHead(ch.title);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN GENERATE
+// ══════════════════════════════════════════════════════════════
+async function generateBook() {
+  const key = getKey();
+  if (!key) { toast('⚠️ أدخل مفتاح Claude API أولاً'); return; }
+
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { toast('⚠️ أدخل موضوع الكتاب'); return; }
+
+  const userTitle = document.getElementById('title').value.trim();
+  const author    = document.getElementById('author').value.trim() || 'المؤلف';
+  const niche     = document.getElementById('niche').value.trim() || topic;
+  const audience  = document.getElementById('audience').value;
+  const lang      = document.getElementById('lang').value;
+  const tone      = document.getElementById('tone').value;
+  const nChapters = parseInt(document.getElementById('chapters').value);
+  const notes     = document.getElementById('notes').value.trim();
+  const bookType  = document.querySelector('#typeChips .chip.on')?.dataset.v || 'Educational';
+  const isAr      = lang === 'Arabic';
+
+  const featFlags = {
+    images:    isFeat('feat-images'),
+    charts:    isFeat('feat-charts'),
+    tables:    isFeat('feat-tables'),
+    stats:     isFeat('feat-stats'),
+    tips:      isFeat('feat-tips'),
+    checklist: isFeat('feat-checklist'),
+    exercise:  isFeat('feat-exercise'),
+    quotes:    isFeat('feat-quotes'),
+    casestudy: isFeat('feat-casestudy'),
+    glossary:  isFeat('feat-glossary'),
+    dropcap:   isFeat('feat-dropcap'),
+    ornaments: isFeat('feat-ornaments'),
+  };
+
+  // Reset
+  setBusy(true);
+  totalWords = 0; totalImages = 0; totalTables = 0; totalCharts = 0;
+  pageCounter = 1;
+  chartInstances.forEach(c => c.destroy?.());
+  chartInstances = [];
+  document.getElementById('bookWrap').innerHTML = '';
+  document.getElementById('bookWrap').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+
+  // ── STEP 1: Outline ──────────────────────────────────────
+  setStatus('توليد هيكل الكتاب...', 'busy', 8);
+  let outline;
+  try {
+    outline = await ai(promptOutline(topic, niche, userTitle, bookType, tone, lang, audience, nChapters, notes, featFlags));
+  } catch(e) { return handleErr(e); }
+
+  let book;
+  try {
+    book = JSON.parse(outline.replace(/```json|```/g,'').trim());
+  } catch { return handleErr(new Error('خطأ في تحليل الهيكل. أعد المحاولة.')); }
+
+  const finalTitle = book.title || userTitle || topic;
+  const subtitle   = book.subtitle || '';
+
+  document.getElementById('previewTitle').textContent = '📚 ' + finalTitle;
+  document.getElementById('bookWrap').style.display = 'flex';
+
+  // ── RENDER COVER ─────────────────────────────────────────
+  setStatus('رسم الغلاف...', 'busy', 12);
+  makePage(`
+    <div class="cover-bg"></div>
+    <div class="cover-corners"></div>
+    <div class="cover-inner">
+      <div class="cover-ornament">❧ ${bookType.toUpperCase()} ❧</div>
+      <div class="cover-title">${esc(finalTitle)}</div>
+      <div class="cover-divider"></div>
+      <div class="cover-subtitle">${esc(subtitle)}</div>
+      <div class="cover-line2"></div>
+      <div class="cover-author-box">
+        <div class="cover-by">${isAr ? 'تأليف' : 'By'}</div>
+        <div class="cover-author">${esc(author)}</div>
+      </div>
+    </div>
+    <div class="cover-year">✦ ${new Date().getFullYear()} ✦</div>
+  `, 'cover');
+
+  // ── COPYRIGHT ─────────────────────────────────────────────
+  makePage(`
+    <div style="height:580px"></div>
+    <div class="copyright-text">
+      <p style="margin-bottom:10px">© ${new Date().getFullYear()} ${esc(author)}. ${isAr ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
+      <p style="margin-bottom:10px">${isAr ? 'لا يجوز إعادة إنتاج أي جزء من هذا الكتاب بأي شكل دون إذن خطي مسبق من الناشر.' : 'No part of this publication may be reproduced without prior written permission.'}</p>
+      <p>${isAr ? 'هذا الكتاب للأغراض التعليمية فقط. يتحمّل القارئ مسؤولية أي قرارات تتخذ بناءً على المحتوى.' : 'This book is for educational purposes only.'}</p>
+      <p style="margin-top:12px">${isAr ? 'الطبعة الأولى — ' : 'First Edition — '}${new Date().getFullYear()}</p>
+      <p style="margin-top:6px">ISBN: 978-X-XXXXXX-XX-X (${isAr ? 'يُحدَّد عند النشر' : 'Assigned upon publication'})</p>
+    </div>
+  `);
+
+  // ── TABLE OF CONTENTS ─────────────────────────────────────
+  const tocItems = [
+    { t: isAr ? 'المقدمة' : 'Introduction', p: 5 },
+    ...(book.chapters||[]).map((c,i) => ({ t: c.title, p: 5 + (i+1)*8 })),
+    { t: isAr ? 'الخاتمة' : 'Conclusion', p: 5 + (book.chapters.length+1)*8 },
+    { t: isAr ? 'عن المؤلف' : 'About the Author', p: 5 + (book.chapters.length+2)*8 },
+    ...(featFlags.glossary ? [{ t: isAr ? 'المسرد' : 'Glossary', p: 5 + (book.chapters.length+3)*8 }] : []),
+  ];
+
+  makePage(`
+    <div class="toc-title">${isAr ? 'المحتويات' : 'Contents'}</div>
+    <div class="toc-rule"></div>
+    ${tocItems.map((item, i) => `
+      <div class="toc-item">
+        <div class="toc-num">${i === 0 || i >= book.chapters.length + 1 ? '—' : String(i).padStart(2,'0')}</div>
+        <div>
+          <div class="toc-ch">${esc(item.t)}</div>
+        </div>
+        <div class="toc-pg">${item.p}</div>
+      </div>`).join('')}
+  `);
+
+  // ── INTRO ─────────────────────────────────────────────────
+  setStatus('كتابة المقدمة...', 'busy', 18);
+  let introText;
+  try {
+    introText = await ai(promptIntro(finalTitle, subtitle, topic, bookType, tone, lang, audience, book.chapters));
+  } catch(e) { return handleErr(e); }
+
+  const introParts = introText.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
+  makePage(`
+    <div class="pg-chapter-label">${isAr ? 'افتتاحية' : 'Opening'}</div>
+    <div class="pg-title">${isAr ? 'المقدمة' : 'Introduction'}</div>
+    <div class="pg-rule"></div>
+    ${introParts.map((p, i) => fmt(p, i === 0 && featFlags.dropcap)).join(featFlags.ornaments ? '<div class="pg-ornament">— ✦ —</div>' : '')}
+  `);
+
+  // ── IMAGE for intro ───────────────────────────────────────
+  if (featFlags.images) {
+    makePage(`
+      <div class="img-block" style="margin:0 -12px">
+        <img src="${getImageUrl(topic, 900, 500)}" alt="${esc(topic)}" loading="lazy" style="max-height:380px" onerror="this.parentElement.style.display='none'">
+        <div class="img-caption">${esc(finalTitle)}</div>
+      </div>
+      ${fmt(book.tagline ? `<p class="pg-body">${book.tagline}</p>` : '')}
+    `);
+    totalImages++;
+  }
+
+  // ── CHAPTERS ─────────────────────────────────────────────
+  const chapters = book.chapters || [];
+  for (let i = 0; i < chapters.length; i++) {
+    const ch = chapters[i];
+    const pct = 20 + Math.round((i / chapters.length) * 65);
+    setStatus(`✍️ كتابة الفصل ${i + 1} / ${chapters.length}: ${ch.title}`, 'busy', pct);
+    try {
+      const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 4500);
+      ch.content = content;
+      renderChapter(ch, i + 1, topic, lang, featFlags);
+    } catch(e) { return handleErr(e); }
+  }
+
+  // ── CONCLUSION ────────────────────────────────────────────
+  setStatus('كتابة الخاتمة...', 'busy', 88);
+  let conc;
+  try {
+    conc = await ai(promptConclusion(finalTitle, topic, bookType, tone, lang, audience, chapters));
+  } catch(e) { return handleErr(e); }
+
+  const concParts = conc.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
+  const [concMain = '', bonusSection = '', aboutSection = '', glossarySection = ''] = concParts;
+
+  makePage(`
+    <div class="pg-chapter-label">${isAr ? 'ختام' : 'Final Words'}</div>
+    <div class="pg-title">${isAr ? 'الخاتمة' : 'Conclusion'}</div>
+    <div class="pg-rule"></div>
+    ${fmt(concMain, featFlags.dropcap)}
+    ${bonusSection ? `
+      <div class="callout" style="margin-top:28px">
+        <div class="callout-title">🎁 ${isAr ? 'هدية المؤلف' : "Author's Bonus"}</div>
+        <div class="callout-body">${esc(bonusSection)}</div>
+      </div>` : ''}
+    <div class="callout crimson" style="margin-top:20px">
+      <div class="callout-title">⭐ ${isAr ? 'شاركنا رأيك' : 'Leave a Review'}</div>
+      <div class="callout-body" style="font-size:13px">${isAr ? 'إذا استفدت من هذا الكتاب، يرجى ترك تقييم على Amazon. مراجعتك تساعد القرّاء الآخرين في اتخاذ قرارهم وتدعم عمل المؤلف. شكراً من القلب!' : "If you found value in this book, please leave a review on Amazon. Your feedback helps other readers and supports the author's work."}</div>
+    </div>
+  `);
+
+  // ── ABOUT AUTHOR ──────────────────────────────────────────
+  makePage(`
+    <div class="pg-chapter-label">${isAr ? 'التعريف' : 'Biography'}</div>
+    <div class="pg-title">${isAr ? 'عن المؤلف' : 'About the Author'}</div>
+    <div class="pg-rule"></div>
+    <div class="author-box">
+      <div class="author-ava">✍️</div>
+      <div>
+        <div class="author-name">${esc(author)}</div>
+        <div class="author-bio">${esc(aboutSection || (isAr ? 'مؤلف ومفكر متخصص في مجال ' + topic + '، يسعى دائماً لتقديم محتوى عملي ذي قيمة حقيقية.' : 'An author and thinker specializing in ' + topic + ', committed to delivering practical, high-value content.'))}</div>
+      </div>
+    </div>
+  `);
+
+  // ── GLOSSARY ──────────────────────────────────────────────
+  if (featFlags.glossary && glossarySection) {
+    makePage(`
+      <div class="pg-chapter-label">${isAr ? 'مرجع' : 'Reference'}</div>
+      <div class="pg-title">${isAr ? 'مسرد المصطلحات' : 'Glossary'}</div>
+      <div class="pg-rule"></div>
+      ${fmt(glossarySection)}
+    `);
+  }
+
+  // ── DONE ──────────────────────────────────────────────────
+  setStatus('✅ الكتاب جاهز للنشر على Amazon KDP!', 'done', 100);
+  setBusy(false);
+  document.querySelector('.gen-btn .bt').textContent = '🔄 إعادة التوليد';
+  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'flex'; });
+  updateStats();
+  showTab('stats', document.querySelectorAll('.stab')[2]);
+  toast('🎉 تم توليد الكتاب بنجاح! اضغط "طباعة / PDF" للتصدير بجودة عالية');
+
+  // Scroll to top of book
+  document.getElementById('bookWrap').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PROMPTS
+// ══════════════════════════════════════════════════════════════
+function promptOutline(topic, niche, title, bookType, tone, lang, audience, n, notes, f) {
+  const extras = [
+    f.stats && 'stat boxes with real data',
+    f.charts && 'chart data',
+    f.tables && 'data tables',
+    f.casestudy && 'case studies',
+    f.glossary && 'glossary terms',
+  ].filter(Boolean).join(', ');
+
+  return `You are an elite book architect and Amazon KDP bestseller strategist.
+
+Generate a complete book outline in JSON for:
+- Topic: "${topic}"
+- Niche: "${niche}"
+- Type: ${bookType}
+- Language: ${lang}
+- Audience: ${audience}
+- Tone: ${tone}
+- Chapters: ${n}
+- Requested elements: ${extras || 'standard'}
+${notes ? `- Notes: ${notes}` : ''}
+
+Return ONLY this exact JSON (no extra text, no markdown):
+{
+  "title": "Compelling Amazon-optimized title in ${lang}",
+  "subtitle": "Powerful subtitle in ${lang}",
+  "tagline": "One impactful sentence in ${lang}",
+  "chapters": [
+    {
+      "title": "Chapter title in ${lang}",
+      "subtitle": "Chapter subtitle — compelling teaser in ${lang}",
+      "keyPoints": ["point 1", "point 2", "point 3", "point 4"],
+      "imageQuery": "English search query for Unsplash image",
+      "chartSuggestion": "type:bar, labels:[...], title, description",
+      "tableSuggestion": "What kind of comparison table would fit"
+    }
+  ]
+}
+
+Title must be commercially compelling. Each chapter title must be specific and engaging. Return pure JSON only.`;
+}
+
+function promptIntro(title, subtitle, topic, bookType, tone, lang, audience, chapters) {
+  const chList = (chapters||[]).map((c,i) => `${i+1}. ${c.title}`).join('\n');
+  return `You are a world-class ${bookType} author. Write in ${lang}.
+
+Book: "${title}" — ${subtitle}
+Topic: ${topic} | Audience: ${audience} | Tone: ${tone}
+
+Chapter overview:
+${chList}
+
+Write:
+1. INTRODUCTION (400-500 words in ${lang}): Hook with a powerful story or statistic, explain the problem, promise the transformation, preview chapters. Be specific, emotional, and human.
+
+2. HOW TO USE THIS BOOK (120 words in ${lang}): Practical reading guide.
+
+Separate with [SECTION_BREAK]
+
+Write naturally, like a respected human expert author. No AI clichés. Pure value.`;
+}
+
+function promptChapter(ch, num, bookTitle, topic, bookType, tone, lang, audience, f, notes) {
+  const isAr = lang === 'Arabic';
+  return `You are a world-class ${bookType} author writing Chapter ${num} of "${bookTitle}".
+
+Chapter: "${ch.title}"
+Subtitle: "${ch.subtitle || ''}"
+Key points: ${(ch.keyPoints||[]).join(', ')}
+Language: ${lang} | Audience: ${audience} | Tone: ${tone}
+${notes ? `Special notes: ${notes}` : ''}
+
+Write 800-1000 words of original, expert-level content. Use this exact structure:
+
+[CHAPTER_INTRO]
+2-3 sentence hook that grabs the reader immediately.
+
+[BODY]
+Main chapter content with ## and ### headings. Cover all key points with:
+- Specific examples and real-world applications
+- Varied sentence structure
+- Actionable insights
+- Natural expert voice
+${f.quotes ? "Include: [QUOTE]An impactful quote from a known figure relevant to this chapter[/QUOTE]" : ''}
+
+${f.stats ? `[STATS]
+3 powerful statistics related to this chapter. Format each as: number, unit/symbol, brief label
+Example: 73%, of companies, adopt AI | 4x, faster, with systems | $2.3B, market size, by 2026
+Separate with |` : ''}
+
+${f.charts ? `[CHART_DATA]
+Create a relevant chart. Return JSON:
+{"type":"bar","title":"Chart title in ${lang}","labels":["label1","label2","label3","label4","label5"],"data":[45,67,89,34,78],"label":"Series name"}
+Types: bar, line, doughnut, pie` : ''}
+
+${f.tables ? `[TABLE_DATA]
+Create a relevant comparison/data table. Return JSON:
+{"title":"Table title in ${lang}","headers":["Column 1","Column 2","Column 3"],"rows":[["row1col1","row1col2","row1col3"],["row2col1","row2col2","row2col3"]]}` : ''}
+
+${f.tips ? '[TIPS]\n3-5 golden tips. Format: [TIP_TITLE]: tip explanation' : ''}
+
+${f.checklist ? '[CHECKLIST]\n5-7 actionable items the reader can do today.' : ''}
+
+${f.casestudy ? '[CASE_STUDY]\nA brief (100-word) real-world example or success story.' : ''}
+
+${f.exercise ? `[EXERCISE]\nOne practical exercise with clear step-by-step instructions (100-120 words in ${lang}).` : ''}
+
+Write entirely in ${lang}. Sound like a knowledgeable human expert, not AI. Every sentence must add genuine value.`;
+}
+
+function promptConclusion(title, topic, bookType, tone, lang, audience, chapters) {
+  const isAr = lang === 'Arabic';
+  return `You are the author of "${title}". Write in ${lang}.
+
+Chapters covered: ${(chapters||[]).map(c => c.title).join(', ')}
+
+Write four sections separated by [SECTION_BREAK]:
+
+Section 1 — CONCLUSION (300-380 words): Powerful emotional close. Summarize the journey, reinforce the transformation, end with an inspiring unforgettable statement.
+
+Section 2 — BONUS (150 words): A valuable bonus tip, resource list, or quick-reference guide related to ${topic}.
+
+Section 3 — ABOUT AUTHOR (100 words): Third-person author bio for a specialist in ${topic}.
+
+${isAr ? 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.' : 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.'}
+
+Separate each with [SECTION_BREAK]. Write naturally and powerfully.`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ERROR HANDLER
+// ══════════════════════════════════════════════════════════════
+function handleErr(e) {
+  const msg = e?.message || 'خطأ غير معروف';
+  setStatus('❌ ' + msg, 'err', 0);
+  toast('❌ ' + msg, 6000);
+  setBusy(false);
+  document.getElementById('emptyState').style.display = 'flex';
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT / COPY
+// ══════════════════════════════════════════════════════════════
+function copyBook() {
+  const text = document.getElementById('bookWrap').innerText;
+  navigator.clipboard.writeText(text).then(() => toast('📋 تم نسخ الكتاب كاملاً!'));
+}
+
+function exportBook() {
+  const title = document.getElementById('previewTitle').textContent.replace('📚 ', '');
+  const content = document.getElementById('bookWrap').innerHTML;
+  const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('');
+  const links = Array.from(document.querySelectorAll('link')).map(l => l.outerHTML).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(title)}</title>
+${links}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"><\/script>
+${styles}
+<style>body{background:#c8c2b8;padding:28px}.book-wrap{display:flex;flex-direction:column;align-items:center;gap:24px}@media print{body{background:#fff;padding:0}.book-wrap{gap:0}.page{box-shadow:none;border:none;max-width:100%;border-radius:0;page-break-after:always;break-after:page;min-height:0}.cover{min-height:842px}}</style>
+</head>
+<body>
+<div class="book-wrap">${content}</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = title.replace(/[^\w\s\u0600-\u06FF]/gi, '').trim().replace(/\s+/g, '-') + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('⬇ تم التصدير! افتح الملف في متصفحك واطبعه كـ PDF عالي الجودة');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  initChips();
+  const saved = localStorage.getItem('kdp_pro_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+});
+</script>
+</body>
+</html>
