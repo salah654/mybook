@@ -6,6 +6,7 @@
 <title>📚 KDP Pro — مولّد الكتب المتطور</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ══════════════════════════════════════════
    DESIGN SYSTEM — Luxury Editorial Dark
@@ -549,7 +550,7 @@ select.input {
     KDP Pro Publisher
   </div>
   <div class="hactions">
-    <span class="hbadge">AI BOOK GENERATOR v2</span>
+    <span class="hbadge">AI BOOK GENERATOR v3</span>
   </div>
 </header>
 
@@ -577,7 +578,15 @@ select.input {
         <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api03-...">
         <button class="api-eye" onclick="toggleVis()" id="apiEye">👁</button>
       </div>
-      <div class="api-note">احصل على مفتاحك من <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> · يُحفظ في متصفحك فقط</div>
+      <div class="api-note">احصل على مفتاحك من <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> · يُحفظ في متصفحك فقط (localStorage) ولا يُرسل لأي جهة سوى Anthropic مباشرة</div>
+      <div class="field" style="margin-top:10px;margin-bottom:0">
+        <label>نموذج الذكاء الاصطناعي</label>
+        <select class="input" id="modelSelect">
+          <option value="claude-opus-5" selected>Claude Opus 5 — أعلى جودة (موصى به)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — متوازن (أسرع وأرخص)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 — الأسرع والأقل تكلفة</option>
+        </select>
+      </div>
     </div>
 
     <!-- Book Info -->
@@ -679,7 +688,7 @@ select.input {
       <div class="feat-grid">
         <div class="feat-item on" id="feat-images" onclick="toggleFeat(this)">
           <div class="feat-icon">🖼</div>
-          <div><div class="feat-label">صور Unsplash</div><div class="feat-sub">صور مجانية تلقائية</div></div>
+          <div><div class="feat-label">لوحات فصول فنية</div><div class="feat-sub">تصميم تحريري تلقائي</div></div>
           <div class="feat-check">✓</div>
         </div>
         <div class="feat-item on" id="feat-charts" onclick="toggleFeat(this)">
@@ -697,6 +706,17 @@ select.input {
           <div><div class="feat-label">بطاقات إحصاء</div><div class="feat-sub">أرقام بارزة</div></div>
           <div class="feat-check">✓</div>
         </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>مصدر صور الفصول</label>
+        <select class="input" id="imgSource" onchange="document.getElementById('unsplashField').style.display=this.value==='unsplash'?'block':'none'">
+          <option value="art" selected>لوحات فنية مصممة (بدون مفتاح — الافتراضي)</option>
+          <option value="unsplash">صور Unsplash حقيقية (يتطلب مفتاح مجاني)</option>
+        </select>
+      </div>
+      <div class="field" id="unsplashField" style="display:none">
+        <label>مفتاح Unsplash Access Key (اختياري)</label>
+        <input class="input" id="unsplashKey" placeholder="احصل عليه مجاناً من unsplash.com/developers" style="direction:ltr;text-align:left;font-family:'JetBrains Mono',monospace">
       </div>
     </div>
 
@@ -815,7 +835,8 @@ select.input {
     <div class="pbar-actions">
       <button class="pbtn" id="copyBtn" style="display:none" onclick="copyBook()">📋 نسخ</button>
       <button class="pbtn" id="printBtn" style="display:none" onclick="window.print()">🖨 طباعة / PDF</button>
-      <button class="pbtn gold" id="exportBtn" style="display:none" onclick="exportBook()">⬇ تصدير HTML</button>
+      <button class="pbtn" id="exportBtn" style="display:none" onclick="exportBook()">⬇ تصدير HTML</button>
+      <button class="pbtn gold" id="epubBtn" style="display:none" onclick="exportEpub()">📱 تصدير EPUB</button>
     </div>
   </div>
 
@@ -859,6 +880,7 @@ select.input {
 let totalWords = 0, totalImages = 0, totalTables = 0, totalCharts = 0;
 let pageCounter = 1;
 let chartInstances = [];
+let lastBookMeta = null;
 
 // ══════════════════════════════════════════════════════════════
 //  UI HELPERS
@@ -924,7 +946,9 @@ function updateStats() {
   document.getElementById('sc-images').textContent = totalImages;
   document.getElementById('sc-tables').textContent = totalTables;
   document.getElementById('sc-charts').textContent = totalCharts;
-  const cost = ((totalWords / 1000) * 0.003).toFixed(3);
+  const price = MODEL_PRICE[getModel()] || MODEL_PRICE['claude-opus-5'];
+  const approxTokens = totalWords * 1.33;
+  const cost = ((approxTokens / 1e6) * price.out).toFixed(3);
   document.getElementById('sc-cost').textContent = '~$' + cost;
   document.getElementById('sc-words-bar').style.width = Math.min(100, totalWords / 80) + '%';
   document.getElementById('sc-pages-bar').style.width = Math.min(100, pages / 1.5) + '%';
@@ -939,26 +963,118 @@ function getKey() {
   return v;
 }
 
+function getModel() {
+  return document.getElementById('modelSelect').value || 'claude-opus-5';
+}
+
+const MODEL_PRICE = {
+  'claude-opus-5':    { out: 25 },
+  'claude-sonnet-5':  { out: 10 },
+  'claude-haiku-4-5': { out: 5  },
+};
+
 async function ai(prompt, maxTok = 4000) {
   const key = getKey();
   if (!key) throw new Error('أدخل مفتاح API أولاً');
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] })
-  });
+  const model = getModel();
+
+  const body = { model, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': key,
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+  if (model === 'claude-opus-5') {
+    headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+    body.fallbacks = 'default';
+  }
+
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch {
+    throw new Error('تعذّر الاتصال بواجهة Anthropic API. تحقّق من اتصال الإنترنت — بعض الشبكات (مثل شبكات الشركات) قد تحجب الوصول المباشر من المتصفح.');
+  }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
   const d = await r.json();
-  totalWords += (d.content[0]?.text || '').split(/\s+/).length;
-  return d.content.map(b => b.text || '').join('');
+  if (d.stop_reason === 'refusal') {
+    throw new Error('رفض النموذج توليد هذا المحتوى' + (d.stop_details?.explanation ? `: ${d.stop_details.explanation}` : '. جرّب صياغة أخرى للموضوع.'));
+  }
+  const text = d.content.map(b => b.text || '').join('');
+  totalWords += text.split(/\s+/).filter(Boolean).length;
+  return text;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  UNSPLASH IMAGE (free, no key needed via source.unsplash.com)
+//  CHAPTER PLATE ART (self-contained SVG — always works, no
+//  external image service or key required)
 // ══════════════════════════════════════════════════════════════
-function getImageUrl(query, w = 900, h = 500) {
-  const q = encodeURIComponent(query);
-  return `https://source.unsplash.com/${w}x${h}/?${q}`;
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; }
+  return Math.abs(h);
+}
+
+function svgEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function chapterPlateSvg(label, numeral, w = 900, h = 500) {
+  const h1 = hashStr(label || 'book');
+  const hueShift = (h1 % 14) - 7; // subtle per-chapter variance
+  const gold = `hsl(${43 + hueShift},58%,58%)`;
+  const gold2 = `hsl(${45 + hueShift},70%,72%)`;
+  const short = svgEsc((label || '').slice(0, 46));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0c0e13"/>
+        <stop offset="55%" stop-color="#161a24"/>
+        <stop offset="100%" stop-color="#0a0b0f"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="42%" r="60%">
+        <stop offset="0%" stop-color="${gold}" stop-opacity="0.16"/>
+        <stop offset="100%" stop-color="${gold}" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="${w}" height="${h}" fill="url(#bg)"/>
+    <rect width="${w}" height="${h}" fill="url(#glow)"/>
+    <g opacity="0.5" stroke="${gold}" stroke-width="1">
+      <path d="M ${w*0.06} ${h*0.14} h 46 M ${w*0.06} ${h*0.14} v 46" fill="none"/>
+      <path d="M ${w*0.94} ${h*0.86} h -46 M ${w*0.94} ${h*0.86} v -46" fill="none"/>
+    </g>
+    <circle cx="${w/2}" cy="${h*0.44}" r="${h*0.24}" fill="none" stroke="${gold}" stroke-width="1.5" opacity="0.55"/>
+    <circle cx="${w/2}" cy="${h*0.44}" r="${h*0.30}" fill="none" stroke="${gold}" stroke-width="1" opacity="0.25"/>
+    <text x="50%" y="${h*0.44}" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="${h*0.22}" fill="${gold2}" opacity="0.92">${svgEsc(numeral || '❧')}</text>
+    <text x="50%" y="${h*0.84}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="20" letter-spacing="2" fill="#cfc9bd" opacity="0.75">${short}</text>
+  </svg>`;
+}
+
+function chapterPlateUri(label, numeral, w = 900, h = 500) {
+  return 'data:image/svg+xml,' + encodeURIComponent(chapterPlateSvg(label, numeral, w, h));
+}
+
+async function fetchUnsplashUrl(query) {
+  const key = document.getElementById('unsplashKey')?.value.trim();
+  if (!key) return null;
+  try {
+    const r = await fetch(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape`, {
+      headers: { Authorization: `Client-ID ${key}` }
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.urls?.regular || null;
+  } catch { return null; }
+}
+
+async function getChapterImageSrc(query, label, numeral) {
+  const source = document.getElementById('imgSource')?.value || 'art';
+  if (source === 'unsplash') {
+    const url = await fetchUnsplashUrl(query);
+    if (url) return url;
+  }
+  return chapterPlateUri(label, numeral);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1105,7 +1221,7 @@ function parseChecklist(raw) {
 // ══════════════════════════════════════════════════════════════
 //  RENDER CHAPTER
 // ══════════════════════════════════════════════════════════════
-function renderChapter(ch, num, topic, lang, featFlags) {
+async function renderChapter(ch, num, topic, lang, featFlags) {
   const raw = ch.content || '';
   const intro = parseSection(raw, 'CHAPTER_INTRO');
   let body = parseSection(raw, 'BODY');
@@ -1133,10 +1249,10 @@ function renderChapter(ch, num, topic, lang, featFlags) {
   // Image
   if (featFlags.images) {
     const imgQuery = `${topic} ${ch.title}`;
-    const cid = 'img_' + num + '_' + Date.now();
+    const imgSrc = await getChapterImageSrc(imgQuery, ch.title, String(num).padStart(2, '0'));
     html += `
       <div class="img-block">
-        <img src="${getImageUrl(imgQuery)}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+        <img src="${imgSrc}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
         <div class="img-caption">${esc(ch.title)}</div>
       </div>`;
     totalImages++;
@@ -1171,6 +1287,7 @@ function renderChapter(ch, num, topic, lang, featFlags) {
   }
 
   // Chart
+  let pendingChart = null;
   if (featFlags.charts && chartData) {
     try {
       let cd;
@@ -1183,8 +1300,7 @@ function renderChapter(ch, num, topic, lang, featFlags) {
             <div class="chart-title">${esc(chartTitle)}</div>
             <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
           </div>`;
-        // Create chart after render
-        setTimeout(() => createChart(canvasId, cd.type || 'bar', cd.labels || [], cd.data || [], cd.label || '', null), 200);
+        pendingChart = () => createChart(canvasId, cd.type || 'bar', cd.labels || [], cd.data || [], cd.label || '', null);
       }
     } catch {}
   }
@@ -1243,6 +1359,7 @@ function renderChapter(ch, num, topic, lang, featFlags) {
 
   makePage(html);
   setRunningHead(ch.title);
+  if (pendingChart) pendingChart();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1290,7 +1407,7 @@ async function generateBook() {
   document.getElementById('bookWrap').innerHTML = '';
   document.getElementById('bookWrap').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
-  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  ['copyBtn','printBtn','exportBtn','epubBtn'].forEach(id => { document.getElementById(id).style.display = 'none'; });
 
   // ── STEP 1: Outline ──────────────────────────────────────
   setStatus('توليد هيكل الكتاب...', 'busy', 8);
@@ -1306,6 +1423,7 @@ async function generateBook() {
 
   const finalTitle = book.title || userTitle || topic;
   const subtitle   = book.subtitle || '';
+  lastBookMeta = { title: finalTitle, author, lang };
 
   document.getElementById('previewTitle').textContent = '📚 ' + finalTitle;
   document.getElementById('bookWrap').style.display = 'flex';
@@ -1380,9 +1498,10 @@ async function generateBook() {
 
   // ── IMAGE for intro ───────────────────────────────────────
   if (featFlags.images) {
+    const introImgSrc = await getChapterImageSrc(topic, finalTitle, '❧');
     makePage(`
       <div class="img-block" style="margin:0 -12px">
-        <img src="${getImageUrl(topic, 900, 500)}" alt="${esc(topic)}" loading="lazy" style="max-height:380px" onerror="this.parentElement.style.display='none'">
+        <img src="${introImgSrc}" alt="${esc(topic)}" loading="lazy" style="max-height:380px" onerror="this.parentElement.style.display='none'">
         <div class="img-caption">${esc(finalTitle)}</div>
       </div>
       ${fmt(book.tagline ? `<p class="pg-body">${book.tagline}</p>` : '')}
@@ -1399,7 +1518,7 @@ async function generateBook() {
     try {
       const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 4500);
       ch.content = content;
-      renderChapter(ch, i + 1, topic, lang, featFlags);
+      await renderChapter(ch, i + 1, topic, lang, featFlags);
     } catch(e) { return handleErr(e); }
   }
 
@@ -1457,7 +1576,7 @@ async function generateBook() {
   setStatus('✅ الكتاب جاهز للنشر على Amazon KDP!', 'done', 100);
   setBusy(false);
   document.querySelector('.gen-btn .bt').textContent = '🔄 إعادة التوليد';
-  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'flex'; });
+  ['copyBtn','printBtn','exportBtn','epubBtn'].forEach(id => { document.getElementById(id).style.display = 'flex'; });
   updateStats();
   showTab('stats', document.querySelectorAll('.stab')[2]);
   toast('🎉 تم توليد الكتاب بنجاح! اضغط "طباعة / PDF" للتصدير بجودة عالية');
@@ -1648,6 +1767,148 @@ ${styles}
   a.click();
   URL.revokeObjectURL(url);
   toast('⬇ تم التصدير! افتح الملف في متصفحك واطبعه كـ PDF عالي الجودة');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EPUB EXPORT (self-contained, valid EPUB3 package via JSZip)
+// ══════════════════════════════════════════════════════════════
+async function exportEpub() {
+  if (typeof JSZip === 'undefined') { toast('⚠️ تعذّر تحميل مكتبة EPUB — تحقق من الاتصال بالإنترنت'); return; }
+
+  const meta = lastBookMeta || {
+    title: document.getElementById('previewTitle').textContent.replace('📚 ', ''),
+    author: 'المؤلف', lang: 'Arabic'
+  };
+  const isAr = meta.lang === 'Arabic';
+  const dir = isAr ? 'rtl' : 'ltr';
+  const langCode = meta.lang === 'Arabic' ? 'ar' : meta.lang === 'French' ? 'fr' : 'en';
+
+  const pages = Array.from(document.querySelectorAll('#bookWrap > .page'));
+  if (!pages.length) { toast('⚠️ لا يوجد كتاب لتصديره بعد'); return; }
+
+  toast('📦 جارٍ بناء ملف EPUB...');
+
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+  zip.file('META-INF/container.xml', `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`);
+
+  const css = `
+body{font-family:Georgia,'Times New Roman',serif;line-height:1.8;margin:1em;color:#1a1714}
+.pg-chapter-label{font-size:.75em;letter-spacing:.15em;color:#a5822a;text-transform:uppercase}
+.pg-title{font-size:1.6em;margin:.2em 0 .4em}
+.pg-rule{display:none}
+.pg-intro{font-style:italic;color:#5a5550;border-${isAr ? 'right' : 'left'}:3px solid #c9a84c;padding-${isAr ? 'right' : 'left'}:.6em;margin-bottom:1em}
+.pg-body{text-align:justify;margin-bottom:1em}
+.pg-h2{font-size:1.3em;margin:1.2em 0 .5em}
+.pg-h3{font-size:1.05em;color:#2d5a3d;margin:1em 0 .4em}
+.pg-quote{font-style:italic;text-align:center;color:#2d5a3d;margin:1.2em 0}
+.pg-ornament{display:none}
+.tip-box,.exercise,.callout{border:1px solid #ddd3b8;border-radius:8px;padding:.8em 1em;margin:1em 0}
+.tip-box-hd,.exercise-hd,.callout-title{font-weight:bold;color:#a5822a;font-size:.85em;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.4em}
+.pg-table{width:100%;border-collapse:collapse;margin:1em 0}
+.pg-table th{background:#1a1714;color:#e2c97e;padding:.4em .6em;text-align:${isAr ? 'right' : 'left'}}
+.pg-table td{padding:.4em .6em;border-bottom:1px solid #ddd}
+.img-block img{max-width:100%}
+.img-caption{font-size:.8em;color:#7a7570;text-align:center;font-style:italic}
+.cover-title,.cover-subtitle,.cover-author,.toc-title{text-align:center}
+.toc-item{display:flex;justify-content:space-between;border-bottom:1px dotted #ccc;padding:.4em 0}
+`.trim();
+  zip.file('OEBPS/style.css', css);
+
+  const manifestItems = [];
+  const spineItems = [];
+  const navItems = [];
+
+  pages.forEach((pageEl, idx) => {
+    const clone = pageEl.cloneNode(true);
+    clone.querySelectorAll('.pg-footer, .chart-wrap').forEach(e => e.remove());
+    clone.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      if (!src.startsWith('data:image/svg')) img.setAttribute('src', chapterPlateUri(img.getAttribute('alt') || meta.title, ''));
+      img.removeAttribute('loading');
+      img.removeAttribute('onerror');
+    });
+
+    const titleEl = clone.querySelector('.pg-title, .toc-title, .cover-title');
+    const navLabel = titleEl?.textContent.trim() || (idx === 0 ? (isAr ? 'الغلاف' : 'Cover') : (isAr ? `صفحة ${idx + 1}` : `Page ${idx + 1}`));
+    const fname = `chap-${String(idx + 1).padStart(2, '0')}.xhtml`;
+
+    // Serialize via XMLSerializer (not .innerHTML) so void elements like <img>
+    // self-close — required for well-formed XHTML that strict e-reader parsers accept.
+    const section = document.createElement('section');
+    section.setAttribute('epub:type', idx === 0 ? 'cover' : 'chapter');
+    section.appendChild(clone);
+    const sectionXml = new XMLSerializer().serializeToString(section);
+
+    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${langCode}" lang="${langCode}" dir="${dir}">
+<head>
+<meta charset="UTF-8"/>
+<title>${esc(navLabel)}</title>
+<link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body dir="${dir}">
+${sectionXml}
+</body>
+</html>`;
+    zip.file(`OEBPS/${fname}`, xhtml);
+    manifestItems.push(`<item id="c${idx + 1}" href="${fname}" media-type="application/xhtml+xml"/>`);
+    spineItems.push(`<itemref idref="c${idx + 1}"/>`);
+    navItems.push(`<li><a href="${fname}">${esc(navLabel)}</a></li>`);
+  });
+
+  const uid = 'urn:uuid:' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
+  const modified = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+
+  const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${langCode}" lang="${langCode}" dir="${dir}">
+<head><meta charset="UTF-8"/><title>${esc(isAr ? 'المحتويات' : 'Contents')}</title><link rel="stylesheet" type="text/css" href="style.css"/></head>
+<body dir="${dir}">
+<nav epub:type="toc" id="toc">
+<h1>${esc(isAr ? 'المحتويات' : 'Contents')}</h1>
+<ol>${navItems.join('')}</ol>
+</nav>
+</body>
+</html>`;
+  zip.file('OEBPS/nav.xhtml', navXhtml);
+  manifestItems.push('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>');
+  manifestItems.push('<item id="css" href="style.css" media-type="text/css"/>');
+
+  const opf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookId" xml:lang="${langCode}">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="BookId">${uid}</dc:identifier>
+<dc:title>${esc(meta.title)}</dc:title>
+<dc:creator>${esc(meta.author)}</dc:creator>
+<dc:language>${langCode}</dc:language>
+<meta property="dcterms:modified">${modified}</meta>
+</metadata>
+<manifest>
+${manifestItems.join('\n')}
+</manifest>
+<spine page-progression-direction="${dir}">
+${spineItems.join('\n')}
+</spine>
+</package>`;
+  zip.file('OEBPS/content.opf', opf);
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = meta.title.replace(/[^\w\s؀-ۿ]/gi, '').trim().replace(/\s+/g, '-') + '.epub';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('📱 تم تصدير EPUB بنجاح! جاهز للرفع على Kindle أو أي قارئ إلكتروني');
+  } catch (e) {
+    toast('❌ فشل إنشاء EPUB: ' + (e?.message || 'خطأ غير معروف'));
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
