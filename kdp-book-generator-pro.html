@@ -1413,13 +1413,17 @@ async function generateBook() {
   setStatus('توليد هيكل الكتاب...', 'busy', 8);
   let outline;
   try {
-    outline = await ai(promptOutline(topic, niche, userTitle, bookType, tone, lang, audience, nChapters, notes, featFlags));
+    outline = await ai(promptOutline(topic, niche, userTitle, bookType, tone, lang, audience, nChapters, notes, featFlags), 8000);
   } catch(e) { return handleErr(e); }
 
   let book;
   try {
-    book = JSON.parse(outline.replace(/```json|```/g,'').trim());
-  } catch { return handleErr(new Error('خطأ في تحليل الهيكل. أعد المحاولة.')); }
+    book = extractJson(outline);
+    if (!book || !Array.isArray(book.chapters) || !book.chapters.length) throw new Error('empty');
+  } catch {
+    console.error('KDP Pro: could not parse outline JSON. Raw model output:\n', outline);
+    return handleErr(new Error('خطأ في تحليل الهيكل — استجابة النموذج لم تكن JSON صالحاً (افتح Console في المتصفح لرؤية التفاصيل). جرّب: تقليل عدد الفصول، أو التبديل إلى نموذج آخر، ثم أعد المحاولة.'));
+  }
 
   const finalTitle = book.title || userTitle || topic;
   const subtitle   = book.subtitle || '';
@@ -1916,6 +1920,19 @@ ${spineItems.join('\n')}
 // ══════════════════════════════════════════════════════════════
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Robustly pull a JSON object out of a model response that may include
+// markdown code fences or stray prose before/after the JSON payload.
+function extractJson(text) {
+  let s = String(text || '').replace(/```json|```/gi, '').trim();
+  try { return JSON.parse(s); } catch {}
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    return JSON.parse(s.slice(start, end + 1));
+  }
+  throw new Error('no JSON object found');
 }
 
 // ══════════════════════════════════════════════════════════════
