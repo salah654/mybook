@@ -6,6 +6,7 @@
 <title>📚 KDP Pro — مولّد الكتب المتطور</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ══════════════════════════════════════════
    DESIGN SYSTEM — Luxury Editorial Dark
@@ -549,7 +550,7 @@ select.input {
     KDP Pro Publisher
   </div>
   <div class="hactions">
-    <span class="hbadge">AI BOOK GENERATOR v2</span>
+    <span class="hbadge">AI BOOK GENERATOR v3</span>
   </div>
 </header>
 
@@ -577,7 +578,15 @@ select.input {
         <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api03-...">
         <button class="api-eye" onclick="toggleVis()" id="apiEye">👁</button>
       </div>
-      <div class="api-note">احصل على مفتاحك من <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> · يُحفظ في متصفحك فقط</div>
+      <div class="api-note">احصل على مفتاحك من <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> · يُحفظ في متصفحك فقط (localStorage) ولا يُرسل لأي جهة سوى Anthropic مباشرة</div>
+      <div class="field" style="margin-top:10px;margin-bottom:0">
+        <label>نموذج الذكاء الاصطناعي</label>
+        <select class="input" id="modelSelect">
+          <option value="claude-opus-5" selected>Claude Opus 5 — أعلى جودة (موصى به)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — متوازن (أسرع وأرخص)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 — الأسرع والأقل تكلفة</option>
+        </select>
+      </div>
     </div>
 
     <!-- Book Info -->
@@ -679,7 +688,7 @@ select.input {
       <div class="feat-grid">
         <div class="feat-item on" id="feat-images" onclick="toggleFeat(this)">
           <div class="feat-icon">🖼</div>
-          <div><div class="feat-label">صور Unsplash</div><div class="feat-sub">صور مجانية تلقائية</div></div>
+          <div><div class="feat-label">لوحات فصول فنية</div><div class="feat-sub">تصميم تحريري تلقائي</div></div>
           <div class="feat-check">✓</div>
         </div>
         <div class="feat-item on" id="feat-charts" onclick="toggleFeat(this)">
@@ -697,6 +706,17 @@ select.input {
           <div><div class="feat-label">بطاقات إحصاء</div><div class="feat-sub">أرقام بارزة</div></div>
           <div class="feat-check">✓</div>
         </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>مصدر صور الفصول</label>
+        <select class="input" id="imgSource" onchange="document.getElementById('unsplashField').style.display=this.value==='unsplash'?'block':'none'">
+          <option value="art" selected>لوحات فنية مصممة (بدون مفتاح — الافتراضي)</option>
+          <option value="unsplash">صور Unsplash حقيقية (يتطلب مفتاح مجاني)</option>
+        </select>
+      </div>
+      <div class="field" id="unsplashField" style="display:none">
+        <label>مفتاح Unsplash Access Key (اختياري)</label>
+        <input class="input" id="unsplashKey" placeholder="احصل عليه مجاناً من unsplash.com/developers" style="direction:ltr;text-align:left;font-family:'JetBrains Mono',monospace">
       </div>
     </div>
 
@@ -815,7 +835,8 @@ select.input {
     <div class="pbar-actions">
       <button class="pbtn" id="copyBtn" style="display:none" onclick="copyBook()">📋 نسخ</button>
       <button class="pbtn" id="printBtn" style="display:none" onclick="window.print()">🖨 طباعة / PDF</button>
-      <button class="pbtn gold" id="exportBtn" style="display:none" onclick="exportBook()">⬇ تصدير HTML</button>
+      <button class="pbtn" id="exportBtn" style="display:none" onclick="exportBook()">⬇ تصدير HTML</button>
+      <button class="pbtn gold" id="epubBtn" style="display:none" onclick="exportEpub()">📱 تصدير EPUB</button>
     </div>
   </div>
 
@@ -859,6 +880,7 @@ select.input {
 let totalWords = 0, totalImages = 0, totalTables = 0, totalCharts = 0;
 let pageCounter = 1;
 let chartInstances = [];
+let lastBookMeta = null;
 
 // ══════════════════════════════════════════════════════════════
 //  UI HELPERS
@@ -924,7 +946,9 @@ function updateStats() {
   document.getElementById('sc-images').textContent = totalImages;
   document.getElementById('sc-tables').textContent = totalTables;
   document.getElementById('sc-charts').textContent = totalCharts;
-  const cost = ((totalWords / 1000) * 0.003).toFixed(3);
+  const price = MODEL_PRICE[getModel()] || MODEL_PRICE['claude-opus-5'];
+  const approxTokens = totalWords * 1.33;
+  const cost = ((approxTokens / 1e6) * price.out).toFixed(3);
   document.getElementById('sc-cost').textContent = '~$' + cost;
   document.getElementById('sc-words-bar').style.width = Math.min(100, totalWords / 80) + '%';
   document.getElementById('sc-pages-bar').style.width = Math.min(100, pages / 1.5) + '%';
@@ -939,26 +963,174 @@ function getKey() {
   return v;
 }
 
+function getModel() {
+  return document.getElementById('modelSelect').value || 'claude-opus-5';
+}
+
+const MODEL_PRICE = {
+  'claude-opus-5':    { out: 25 },
+  'claude-sonnet-5':  { out: 10 },
+  'claude-haiku-4-5': { out: 5  },
+};
+
 async function ai(prompt, maxTok = 4000) {
   const key = getKey();
   if (!key) throw new Error('أدخل مفتاح API أولاً');
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] })
-  });
+  const model = getModel();
+
+  const body = { model, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': key,
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+  if (model === 'claude-opus-5') {
+    headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+    body.fallbacks = 'default';
+  }
+
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch {
+    throw new Error('تعذّر الاتصال بواجهة Anthropic API. تحقّق من اتصال الإنترنت — بعض الشبكات (مثل شبكات الشركات) قد تحجب الوصول المباشر من المتصفح.');
+  }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || 'HTTP ' + r.status); }
   const d = await r.json();
-  totalWords += (d.content[0]?.text || '').split(/\s+/).length;
-  return d.content.map(b => b.text || '').join('');
+  if (d.stop_reason === 'refusal') {
+    throw new Error('رفض النموذج توليد هذا المحتوى' + (d.stop_details?.explanation ? `: ${d.stop_details.explanation}` : '. جرّب صياغة أخرى للموضوع.'));
+  }
+  const text = d.content.map(b => b.text || '').join('');
+  totalWords += text.split(/\s+/).filter(Boolean).length;
+  return text;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  UNSPLASH IMAGE (free, no key needed via source.unsplash.com)
+//  CHAPTER PLATE ART (self-contained SVG — always works, no
+//  external image service or key required)
 // ══════════════════════════════════════════════════════════════
-function getImageUrl(query, w = 900, h = 500) {
-  const q = encodeURIComponent(query);
-  return `https://source.unsplash.com/${w}x${h}/?${q}`;
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; }
+  return Math.abs(h);
+}
+
+function svgEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function chapterPlateSvg(label, numeral, w = 900, h = 500) {
+  const h1 = hashStr(label || 'book');
+  const hueShift = (h1 % 14) - 7; // subtle per-chapter variance
+  const gold = `hsl(${43 + hueShift},58%,58%)`;
+  const gold2 = `hsl(${45 + hueShift},72%,74%)`;
+  const short = svgEsc((label || '').slice(0, 46));
+  const cx = w / 2, cy = h * 0.42;
+  const rays = 14 + (h1 % 6);
+  const rot = h1 % 360;
+  let rayLines = '';
+  for (let i = 0; i < rays; i++) {
+    const angle = (360 / rays) * i + rot;
+    const rad = angle * Math.PI / 180;
+    const r1 = h * 0.30, r2 = h * 0.30 + h * 0.16 + ((h1 >> i) % 3) * (h * 0.02);
+    const x1 = (cx + Math.cos(rad) * r1).toFixed(1), y1 = (cy + Math.sin(rad) * r1).toFixed(1);
+    const x2 = (cx + Math.cos(rad) * r2).toFixed(1), y2 = (cy + Math.sin(rad) * r2).toFixed(1);
+    rayLines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${gold}" stroke-width="1" opacity="0.28"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0c0e13"/>
+        <stop offset="55%" stop-color="#181c28"/>
+        <stop offset="100%" stop-color="#0a0b0f"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="40%" r="65%">
+        <stop offset="0%" stop-color="${gold}" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="${gold}" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="med" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${gold2}"/>
+        <stop offset="100%" stop-color="${gold}"/>
+      </linearGradient>
+    </defs>
+    <rect width="${w}" height="${h}" fill="url(#bg)"/>
+    <rect width="${w}" height="${h}" fill="url(#glow)"/>
+    ${rayLines}
+    <g stroke="${gold}" stroke-width="1.4" opacity="0.7">
+      <path d="M ${w*0.05} ${h*0.10} h 54 M ${w*0.05} ${h*0.10} v 54" fill="none"/>
+      <path d="M ${w*0.95} ${h*0.90} h -54 M ${w*0.95} ${h*0.90} v -54" fill="none"/>
+    </g>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.30}" fill="none" stroke="${gold}" stroke-width="2" opacity="0.7"/>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.34}" fill="none" stroke="${gold}" stroke-width="1" opacity="0.35"/>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.255}" fill="rgba(0,0,0,.15)" stroke="${gold}" stroke-width="1" opacity="0.5"/>
+    <text x="50%" y="${cy}" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="${h*0.34}" fill="url(#med)">${svgEsc(numeral || '❧')}</text>
+    <text x="50%" y="${h*0.89}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="24" letter-spacing="1" fill="#e7e2d5" opacity="0.9">${short}</text>
+  </svg>`;
+}
+
+function chapterPlateUri(label, numeral, w = 900, h = 500) {
+  return 'data:image/svg+xml,' + encodeURIComponent(chapterPlateSvg(label, numeral, w, h));
+}
+
+// Full-bleed, topic-unique ornamental background for the cover page —
+// concentric rings + a radiating star pattern, seeded from the book title
+// so every book gets a distinct look instead of a flat gradient.
+function coverArtSvg(seedText, w = 800, h = 1200) {
+  const h1 = hashStr(seedText || 'book');
+  const hueShift = (h1 % 20) - 10;
+  const gold = `hsl(${43 + hueShift},60%,58%)`;
+  const cx = w / 2, cy = h * 0.36;
+  const rays = 10 + (h1 % 8);
+  const rot = h1 % 360;
+  let rayLines = '';
+  for (let i = 0; i < rays; i++) {
+    const angle = (360 / rays) * i + rot;
+    const rad = angle * Math.PI / 180;
+    const r1 = h * 0.15, r2 = h * 0.30 + ((h1 >> i) % 3) * (h * 0.015);
+    const x1 = (cx + Math.cos(rad) * r1).toFixed(1), y1 = (cy + Math.sin(rad) * r1).toFixed(1);
+    const x2 = (cx + Math.cos(rad) * r2).toFixed(1), y2 = (cy + Math.sin(rad) * r2).toFixed(1);
+    rayLines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${gold}" stroke-width="1" opacity="0.3"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id="cg" cx="50%" cy="32%" r="55%">
+        <stop offset="0%" stop-color="${gold}" stop-opacity="0.16"/>
+        <stop offset="100%" stop-color="${gold}" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="${w}" height="${h}" fill="url(#cg)"/>
+    ${rayLines}
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.145}" fill="none" stroke="${gold}" stroke-width="1.2" opacity="0.5"/>
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.19}" fill="none" stroke="${gold}" stroke-width="0.8" opacity="0.32"/>
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.235}" fill="none" stroke="${gold}" stroke-width="0.6" opacity="0.18"/>
+  </svg>`;
+}
+
+function coverArtUri(seedText, w = 800, h = 1200) {
+  return 'data:image/svg+xml,' + encodeURIComponent(coverArtSvg(seedText, w, h));
+}
+
+async function fetchUnsplashUrl(query) {
+  const key = document.getElementById('unsplashKey')?.value.trim();
+  if (!key) return null;
+  try {
+    const r = await fetch(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape`, {
+      headers: { Authorization: `Client-ID ${key}` }
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.urls?.regular || null;
+  } catch { return null; }
+}
+
+async function getChapterImageSrc(query, label, numeral) {
+  const source = document.getElementById('imgSource')?.value || 'art';
+  if (source === 'unsplash') {
+    const url = await fetchUnsplashUrl(query);
+    if (url) return url;
+  }
+  return chapterPlateUri(label, numeral);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1041,7 +1213,13 @@ function setRunningHead(text) {
 //  TEXT FORMATTER
 // ══════════════════════════════════════════════════════════════
 function fmt(text, dropcap = false) {
-  if (!text) return '';
+  return fmtBlocks(text, dropcap).join('');
+}
+
+// Same as fmt() but returns each block (paragraph/heading/list) separately,
+// so long chapter bodies can be split across multiple printed pages.
+function fmtBlocks(text, dropcap = false) {
+  if (!text) return [];
   let html = text
     .replace(/^###\s+(.+)$/gm, '<div class="pg-h3">$1</div>')
     .replace(/^##\s+(.+)$/gm, '<div class="pg-h2">$1</div>')
@@ -1075,7 +1253,23 @@ function fmt(text, dropcap = false) {
     }
   });
   closeList();
-  return out.join('');
+  return out;
+}
+
+// Group formatted content blocks into page-sized chunks by accumulated
+// text length, so a long chapter prints as several real pages instead of
+// one tall scrolling div.
+function groupBlocksByLength(blocks, maxChars = 1600) {
+  const groups = [];
+  let cur = [], curLen = 0;
+  blocks.forEach(b => {
+    const len = b.replace(/<[^>]+>/g, '').length;
+    if (cur.length && curLen + len > maxChars) { groups.push(cur); cur = []; curLen = 0; }
+    cur.push(b);
+    curLen += len;
+  });
+  groups.push(cur);
+  return groups;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1105,7 +1299,7 @@ function parseChecklist(raw) {
 // ══════════════════════════════════════════════════════════════
 //  RENDER CHAPTER
 // ══════════════════════════════════════════════════════════════
-function renderChapter(ch, num, topic, lang, featFlags) {
+async function renderChapter(ch, num, topic, lang, featFlags) {
   const raw = ch.content || '';
   const intro = parseSection(raw, 'CHAPTER_INTRO');
   let body = parseSection(raw, 'BODY');
@@ -1122,9 +1316,11 @@ function renderChapter(ch, num, topic, lang, featFlags) {
 
   const isAr = lang === 'Arabic';
   const chLabel = isAr ? 'الفصل' : 'Chapter';
+  const numStr = String(num).padStart(2, '0');
 
-  let html = `
-    <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${String(num).padStart(2,'0')}</span></div>
+  // ── Front matter: label, title, rule, hook, image, stat boxes ──
+  let frontHtml = `
+    <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${numStr}</span></div>
     <div class="pg-title">${esc(ch.title)}</div>
     <div class="pg-rule"></div>
     ${intro ? `<div class="pg-intro">${esc(intro)}</div>` : (ch.subtitle ? `<div class="pg-intro">${esc(ch.subtitle)}</div>` : '')}
@@ -1133,10 +1329,10 @@ function renderChapter(ch, num, topic, lang, featFlags) {
   // Image
   if (featFlags.images) {
     const imgQuery = `${topic} ${ch.title}`;
-    const cid = 'img_' + num + '_' + Date.now();
-    html += `
+    const imgSrc = await getChapterImageSrc(imgQuery, ch.title, numStr);
+    frontHtml += `
       <div class="img-block">
-        <img src="${getImageUrl(imgQuery)}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+        <img src="${imgSrc}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
         <div class="img-caption">${esc(ch.title)}</div>
       </div>`;
     totalImages++;
@@ -1147,30 +1343,25 @@ function renderChapter(ch, num, topic, lang, featFlags) {
     try {
       const statsArr = statsData.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3);
       if (statsArr.length >= 2) {
-        html += '<div class="stat-row">';
+        frontHtml += '<div class="stat-row">';
         statsArr.forEach(s => {
-          const [num, unit, label] = s.split(',').map(x => x.trim());
-          html += `<div class="stat-box"><div class="stat-num">${esc(num)}</div><div class="stat-unit">${esc(unit)}</div><div class="stat-label">${esc(label)}</div></div>`;
+          const [n, unit, label] = s.split(',').map(x => x.trim());
+          frontHtml += `<div class="stat-box"><div class="stat-num">${esc(n)}</div><div class="stat-unit">${esc(unit)}</div><div class="stat-label">${esc(label)}</div></div>`;
         });
-        html += '</div>';
+        frontHtml += '</div>';
       }
     } catch {}
   }
 
-  // Body text
-  html += fmt(body, featFlags.dropcap);
+  // ── Body text, split across as many pages as it needs ──
+  const bodyGroups = groupBlocksByLength(fmtBlocks(body, featFlags.dropcap), 1600);
 
-  // Quote
-  if (featFlags.quotes && quote) {
-    html += `<div class="pg-quote">${esc(quote)}</div>`;
-  }
+  // ── Chapter extras (quote, chart, table, tips...) ride the last page ──
+  let extrasHtml = '';
+  if (featFlags.quotes && quote) extrasHtml += `<div class="pg-quote">${esc(quote)}</div>`;
+  if (featFlags.ornaments) extrasHtml += `<div class="pg-ornament">— ✦ —</div>`;
 
-  // Ornament
-  if (featFlags.ornaments) {
-    html += `<div class="pg-ornament">— ✦ —</div>`;
-  }
-
-  // Chart
+  let pendingChart = null;
   if (featFlags.charts && chartData) {
     try {
       let cd;
@@ -1178,25 +1369,23 @@ function renderChapter(ch, num, topic, lang, featFlags) {
       if (cd) {
         const canvasId = 'chart_' + num + '_' + Date.now();
         const chartTitle = cd.title || (isAr ? 'إحصاءات الفصل' : 'Chapter Statistics');
-        html += `
+        extrasHtml += `
           <div class="chart-wrap">
             <div class="chart-title">${esc(chartTitle)}</div>
             <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
           </div>`;
-        // Create chart after render
-        setTimeout(() => createChart(canvasId, cd.type || 'bar', cd.labels || [], cd.data || [], cd.label || '', null), 200);
+        pendingChart = () => createChart(canvasId, cd.type || 'bar', cd.labels || [], cd.data || [], cd.label || '', null);
       }
     } catch {}
   }
 
-  // Table
   if (featFlags.tables && tableData) {
     try {
       let td;
       try { td = JSON.parse(tableData.replace(/```json|```/g, '').trim()); } catch { td = null; }
       if (td && td.headers && td.rows) {
         const tLabel = td.title || (isAr ? 'جدول البيانات' : 'Data Table');
-        html += `
+        extrasHtml += `
           <div class="table-title">${esc(tLabel)}</div>
           <table class="pg-table">
             <thead><tr>${td.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
@@ -1207,14 +1396,12 @@ function renderChapter(ch, num, topic, lang, featFlags) {
     } catch {}
   }
 
-  // Tips
   if (featFlags.tips && tips.length > 0) {
-    html += `<div class="tip-box"><div class="tip-box-hd">💡 ${isAr ? 'نصائح ذهبية' : 'Golden Tips'}</div>${tips.map(t => `<div class="tip-item"><strong>${esc(t.t)}</strong>: ${esc(t.b)}</div>`).join('')}</div>`;
+    extrasHtml += `<div class="tip-box"><div class="tip-box-hd">💡 ${isAr ? 'نصائح ذهبية' : 'Golden Tips'}</div>${tips.map(t => `<div class="tip-item"><strong>${esc(t.t)}</strong>: ${esc(t.b)}</div>`).join('')}</div>`;
   }
 
-  // Checklist
   if (featFlags.checklist && checklist.length > 0) {
-    html += `
+    extrasHtml += `
       <div class="callout jade">
         <div class="callout-title">✅ ${isAr ? 'قائمة التحقق' : 'Action Checklist'}</div>
         <div class="callout-body">
@@ -1223,26 +1410,36 @@ function renderChapter(ch, num, topic, lang, featFlags) {
       </div>`;
   }
 
-  // Case study
   if (featFlags.casestudy && caseStudy) {
-    html += `
+    extrasHtml += `
       <div class="callout sky">
         <div class="callout-title">🔍 ${isAr ? 'دراسة حالة' : 'Case Study'}</div>
         <div class="callout-body">${esc(caseStudy)}</div>
       </div>`;
   }
 
-  // Exercise
   if (featFlags.exercise && exercise) {
-    html += `
+    extrasHtml += `
       <div class="exercise">
         <div class="exercise-hd">🎯 ${isAr ? 'تمرين عملي' : 'Practical Exercise'}</div>
         <div class="exercise-body">${esc(exercise)}</div>
       </div>`;
   }
 
-  makePage(html);
-  setRunningHead(ch.title);
+  // ── Emit one page per body group; extras land on the final page ──
+  for (let g = 0; g < bodyGroups.length; g++) {
+    const isFirst = g === 0;
+    const isLast = g === bodyGroups.length - 1;
+    let pageHtml = isFirst ? frontHtml : `
+      <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${numStr}</span> — ${isAr ? 'تابع' : 'cont.'}</div>
+      <div class="pg-rule"></div>`;
+    pageHtml += bodyGroups[g].join('');
+    if (isLast) pageHtml += extrasHtml;
+    makePage(pageHtml);
+    setRunningHead(ch.title);
+  }
+
+  if (pendingChart) pendingChart();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1290,22 +1487,27 @@ async function generateBook() {
   document.getElementById('bookWrap').innerHTML = '';
   document.getElementById('bookWrap').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
-  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  ['copyBtn','printBtn','exportBtn','epubBtn'].forEach(id => { document.getElementById(id).style.display = 'none'; });
 
   // ── STEP 1: Outline ──────────────────────────────────────
   setStatus('توليد هيكل الكتاب...', 'busy', 8);
   let outline;
   try {
-    outline = await ai(promptOutline(topic, niche, userTitle, bookType, tone, lang, audience, nChapters, notes, featFlags));
+    outline = await ai(promptOutline(topic, niche, userTitle, bookType, tone, lang, audience, nChapters, notes, featFlags), 8000);
   } catch(e) { return handleErr(e); }
 
   let book;
   try {
-    book = JSON.parse(outline.replace(/```json|```/g,'').trim());
-  } catch { return handleErr(new Error('خطأ في تحليل الهيكل. أعد المحاولة.')); }
+    book = extractJson(outline);
+    if (!book || !Array.isArray(book.chapters) || !book.chapters.length) throw new Error('empty');
+  } catch {
+    console.error('KDP Pro: could not parse outline JSON. Raw model output:\n', outline);
+    return handleErr(new Error('خطأ في تحليل الهيكل — استجابة النموذج لم تكن JSON صالحاً (افتح Console في المتصفح لرؤية التفاصيل). جرّب: تقليل عدد الفصول، أو التبديل إلى نموذج آخر، ثم أعد المحاولة.'));
+  }
 
   const finalTitle = book.title || userTitle || topic;
   const subtitle   = book.subtitle || '';
+  lastBookMeta = { title: finalTitle, author, lang };
 
   document.getElementById('previewTitle').textContent = '📚 ' + finalTitle;
   document.getElementById('bookWrap').style.display = 'flex';
@@ -1313,7 +1515,7 @@ async function generateBook() {
   // ── RENDER COVER ─────────────────────────────────────────
   setStatus('رسم الغلاف...', 'busy', 12);
   makePage(`
-    <div class="cover-bg"></div>
+    <div class="cover-bg" style="background-image:url('${coverArtUri(finalTitle + bookType)}');background-size:cover;background-position:center"></div>
     <div class="cover-corners"></div>
     <div class="cover-inner">
       <div class="cover-ornament">❧ ${bookType.toUpperCase()} ❧</div>
@@ -1367,7 +1569,7 @@ async function generateBook() {
   setStatus('كتابة المقدمة...', 'busy', 18);
   let introText;
   try {
-    introText = await ai(promptIntro(finalTitle, subtitle, topic, bookType, tone, lang, audience, book.chapters));
+    introText = await ai(promptIntro(finalTitle, subtitle, topic, bookType, tone, lang, audience, book.chapters), 6000);
   } catch(e) { return handleErr(e); }
 
   const introParts = introText.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
@@ -1380,9 +1582,10 @@ async function generateBook() {
 
   // ── IMAGE for intro ───────────────────────────────────────
   if (featFlags.images) {
+    const introImgSrc = await getChapterImageSrc(topic, finalTitle, '❧');
     makePage(`
       <div class="img-block" style="margin:0 -12px">
-        <img src="${getImageUrl(topic, 900, 500)}" alt="${esc(topic)}" loading="lazy" style="max-height:380px" onerror="this.parentElement.style.display='none'">
+        <img src="${introImgSrc}" alt="${esc(topic)}" loading="lazy" style="max-height:380px" onerror="this.parentElement.style.display='none'">
         <div class="img-caption">${esc(finalTitle)}</div>
       </div>
       ${fmt(book.tagline ? `<p class="pg-body">${book.tagline}</p>` : '')}
@@ -1397,9 +1600,9 @@ async function generateBook() {
     const pct = 20 + Math.round((i / chapters.length) * 65);
     setStatus(`✍️ كتابة الفصل ${i + 1} / ${chapters.length}: ${ch.title}`, 'busy', pct);
     try {
-      const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 4500);
+      const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 9000);
       ch.content = content;
-      renderChapter(ch, i + 1, topic, lang, featFlags);
+      await renderChapter(ch, i + 1, topic, lang, featFlags);
     } catch(e) { return handleErr(e); }
   }
 
@@ -1407,7 +1610,7 @@ async function generateBook() {
   setStatus('كتابة الخاتمة...', 'busy', 88);
   let conc;
   try {
-    conc = await ai(promptConclusion(finalTitle, topic, bookType, tone, lang, audience, chapters));
+    conc = await ai(promptConclusion(finalTitle, topic, bookType, tone, lang, audience, chapters), 6000);
   } catch(e) { return handleErr(e); }
 
   const concParts = conc.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
@@ -1457,7 +1660,7 @@ async function generateBook() {
   setStatus('✅ الكتاب جاهز للنشر على Amazon KDP!', 'done', 100);
   setBusy(false);
   document.querySelector('.gen-btn .bt').textContent = '🔄 إعادة التوليد';
-  ['copyBtn','printBtn','exportBtn'].forEach(id => { document.getElementById(id).style.display = 'flex'; });
+  ['copyBtn','printBtn','exportBtn','epubBtn'].forEach(id => { document.getElementById(id).style.display = 'flex'; });
   updateStats();
   showTab('stats', document.querySelectorAll('.stab')[2]);
   toast('🎉 تم توليد الكتاب بنجاح! اضغط "طباعة / PDF" للتصدير بجودة عالية');
@@ -1522,7 +1725,7 @@ Chapter overview:
 ${chList}
 
 Write:
-1. INTRODUCTION (400-500 words in ${lang}): Hook with a powerful story or statistic, explain the problem, promise the transformation, preview chapters. Be specific, emotional, and human.
+1. INTRODUCTION (650-800 words in ${lang}): Hook with a powerful story or statistic, explain the problem in depth, promise the transformation, preview chapters. Be specific, emotional, and human.
 
 2. HOW TO USE THIS BOOK (120 words in ${lang}): Practical reading guide.
 
@@ -1541,17 +1744,18 @@ Key points: ${(ch.keyPoints||[]).join(', ')}
 Language: ${lang} | Audience: ${audience} | Tone: ${tone}
 ${notes ? `Special notes: ${notes}` : ''}
 
-Write 800-1000 words of original, expert-level content. Use this exact structure:
+Write 1600-2200 words of original, expert-level content — this is a full, substantial chapter, not a summary. Use this exact structure:
 
 [CHAPTER_INTRO]
 2-3 sentence hook that grabs the reader immediately.
 
 [BODY]
-Main chapter content with ## and ### headings. Cover all key points with:
+Main chapter content, organized into 4-6 clearly separated sections, each starting with a ## heading (use ### for any sub-points). Cover every key point in real depth with:
 - Specific examples and real-world applications
 - Varied sentence structure
 - Actionable insights
 - Natural expert voice
+Do not pad with filler — add depth and more concrete examples per section instead of repeating ideas.
 ${f.quotes ? "Include: [QUOTE]An impactful quote from a known figure relevant to this chapter[/QUOTE]" : ''}
 
 ${f.stats ? `[STATS]
@@ -1587,11 +1791,11 @@ Chapters covered: ${(chapters||[]).map(c => c.title).join(', ')}
 
 Write four sections separated by [SECTION_BREAK]:
 
-Section 1 — CONCLUSION (300-380 words): Powerful emotional close. Summarize the journey, reinforce the transformation, end with an inspiring unforgettable statement.
+Section 1 — CONCLUSION (450-550 words): Powerful emotional close. Summarize the journey, reinforce the transformation, end with an inspiring unforgettable statement.
 
-Section 2 — BONUS (150 words): A valuable bonus tip, resource list, or quick-reference guide related to ${topic}.
+Section 2 — BONUS (250-300 words): A valuable bonus tip, resource list, or quick-reference guide related to ${topic}.
 
-Section 3 — ABOUT AUTHOR (100 words): Third-person author bio for a specialist in ${topic}.
+Section 3 — ABOUT AUTHOR (120-150 words): Third-person author bio for a specialist in ${topic}.
 
 ${isAr ? 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.' : 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.'}
 
@@ -1651,10 +1855,165 @@ ${styles}
 }
 
 // ══════════════════════════════════════════════════════════════
+//  EPUB EXPORT (self-contained, valid EPUB3 package via JSZip)
+// ══════════════════════════════════════════════════════════════
+async function exportEpub() {
+  if (typeof JSZip === 'undefined') { toast('⚠️ تعذّر تحميل مكتبة EPUB — تحقق من الاتصال بالإنترنت'); return; }
+
+  const meta = lastBookMeta || {
+    title: document.getElementById('previewTitle').textContent.replace('📚 ', ''),
+    author: 'المؤلف', lang: 'Arabic'
+  };
+  const isAr = meta.lang === 'Arabic';
+  const dir = isAr ? 'rtl' : 'ltr';
+  const langCode = meta.lang === 'Arabic' ? 'ar' : meta.lang === 'French' ? 'fr' : 'en';
+
+  const pages = Array.from(document.querySelectorAll('#bookWrap > .page'));
+  if (!pages.length) { toast('⚠️ لا يوجد كتاب لتصديره بعد'); return; }
+
+  toast('📦 جارٍ بناء ملف EPUB...');
+
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+  zip.file('META-INF/container.xml', `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`);
+
+  const css = `
+body{font-family:Georgia,'Times New Roman',serif;line-height:1.8;margin:1em;color:#1a1714}
+.pg-chapter-label{font-size:.75em;letter-spacing:.15em;color:#a5822a;text-transform:uppercase}
+.pg-title{font-size:1.6em;margin:.2em 0 .4em}
+.pg-rule{display:none}
+.pg-intro{font-style:italic;color:#5a5550;border-${isAr ? 'right' : 'left'}:3px solid #c9a84c;padding-${isAr ? 'right' : 'left'}:.6em;margin-bottom:1em}
+.pg-body{text-align:justify;margin-bottom:1em}
+.pg-h2{font-size:1.3em;margin:1.2em 0 .5em}
+.pg-h3{font-size:1.05em;color:#2d5a3d;margin:1em 0 .4em}
+.pg-quote{font-style:italic;text-align:center;color:#2d5a3d;margin:1.2em 0}
+.pg-ornament{display:none}
+.tip-box,.exercise,.callout{border:1px solid #ddd3b8;border-radius:8px;padding:.8em 1em;margin:1em 0}
+.tip-box-hd,.exercise-hd,.callout-title{font-weight:bold;color:#a5822a;font-size:.85em;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.4em}
+.pg-table{width:100%;border-collapse:collapse;margin:1em 0}
+.pg-table th{background:#1a1714;color:#e2c97e;padding:.4em .6em;text-align:${isAr ? 'right' : 'left'}}
+.pg-table td{padding:.4em .6em;border-bottom:1px solid #ddd}
+.img-block img{max-width:100%}
+.img-caption{font-size:.8em;color:#7a7570;text-align:center;font-style:italic}
+.cover-title,.cover-subtitle,.cover-author,.toc-title{text-align:center}
+.toc-item{display:flex;justify-content:space-between;border-bottom:1px dotted #ccc;padding:.4em 0}
+`.trim();
+  zip.file('OEBPS/style.css', css);
+
+  const manifestItems = [];
+  const spineItems = [];
+  const navItems = [];
+
+  pages.forEach((pageEl, idx) => {
+    const clone = pageEl.cloneNode(true);
+    clone.querySelectorAll('.pg-footer, .chart-wrap').forEach(e => e.remove());
+    clone.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      if (!src.startsWith('data:image/svg')) img.setAttribute('src', chapterPlateUri(img.getAttribute('alt') || meta.title, ''));
+      img.removeAttribute('loading');
+      img.removeAttribute('onerror');
+    });
+
+    const titleEl = clone.querySelector('.pg-title, .toc-title, .cover-title');
+    const navLabel = titleEl?.textContent.trim() || (idx === 0 ? (isAr ? 'الغلاف' : 'Cover') : (isAr ? `صفحة ${idx + 1}` : `Page ${idx + 1}`));
+    const fname = `chap-${String(idx + 1).padStart(2, '0')}.xhtml`;
+
+    // Serialize via XMLSerializer (not .innerHTML) so void elements like <img>
+    // self-close — required for well-formed XHTML that strict e-reader parsers accept.
+    const section = document.createElement('section');
+    section.setAttribute('epub:type', idx === 0 ? 'cover' : 'chapter');
+    section.appendChild(clone);
+    const sectionXml = new XMLSerializer().serializeToString(section);
+
+    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${langCode}" lang="${langCode}" dir="${dir}">
+<head>
+<meta charset="UTF-8"/>
+<title>${esc(navLabel)}</title>
+<link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body dir="${dir}">
+${sectionXml}
+</body>
+</html>`;
+    zip.file(`OEBPS/${fname}`, xhtml);
+    manifestItems.push(`<item id="c${idx + 1}" href="${fname}" media-type="application/xhtml+xml"/>`);
+    spineItems.push(`<itemref idref="c${idx + 1}"/>`);
+    navItems.push(`<li><a href="${fname}">${esc(navLabel)}</a></li>`);
+  });
+
+  const uid = 'urn:uuid:' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
+  const modified = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+
+  const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${langCode}" lang="${langCode}" dir="${dir}">
+<head><meta charset="UTF-8"/><title>${esc(isAr ? 'المحتويات' : 'Contents')}</title><link rel="stylesheet" type="text/css" href="style.css"/></head>
+<body dir="${dir}">
+<nav epub:type="toc" id="toc">
+<h1>${esc(isAr ? 'المحتويات' : 'Contents')}</h1>
+<ol>${navItems.join('')}</ol>
+</nav>
+</body>
+</html>`;
+  zip.file('OEBPS/nav.xhtml', navXhtml);
+  manifestItems.push('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>');
+  manifestItems.push('<item id="css" href="style.css" media-type="text/css"/>');
+
+  const opf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookId" xml:lang="${langCode}">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="BookId">${uid}</dc:identifier>
+<dc:title>${esc(meta.title)}</dc:title>
+<dc:creator>${esc(meta.author)}</dc:creator>
+<dc:language>${langCode}</dc:language>
+<meta property="dcterms:modified">${modified}</meta>
+</metadata>
+<manifest>
+${manifestItems.join('\n')}
+</manifest>
+<spine page-progression-direction="${dir}">
+${spineItems.join('\n')}
+</spine>
+</package>`;
+  zip.file('OEBPS/content.opf', opf);
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = meta.title.replace(/[^\w\s؀-ۿ]/gi, '').trim().replace(/\s+/g, '-') + '.epub';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('📱 تم تصدير EPUB بنجاح! جاهز للرفع على Kindle أو أي قارئ إلكتروني');
+  } catch (e) {
+    toast('❌ فشل إنشاء EPUB: ' + (e?.message || 'خطأ غير معروف'));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════════════════════════
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Robustly pull a JSON object out of a model response that may include
+// markdown code fences or stray prose before/after the JSON payload.
+function extractJson(text) {
+  let s = String(text || '').replace(/```json|```/gi, '').trim();
+  try { return JSON.parse(s); } catch {}
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    return JSON.parse(s.slice(start, end + 1));
+  }
+  throw new Error('no JSON object found');
 }
 
 // ══════════════════════════════════════════════════════════════
