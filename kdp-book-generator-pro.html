@@ -1024,35 +1024,91 @@ function chapterPlateSvg(label, numeral, w = 900, h = 500) {
   const h1 = hashStr(label || 'book');
   const hueShift = (h1 % 14) - 7; // subtle per-chapter variance
   const gold = `hsl(${43 + hueShift},58%,58%)`;
-  const gold2 = `hsl(${45 + hueShift},70%,72%)`;
+  const gold2 = `hsl(${45 + hueShift},72%,74%)`;
   const short = svgEsc((label || '').slice(0, 46));
+  const cx = w / 2, cy = h * 0.42;
+  const rays = 14 + (h1 % 6);
+  const rot = h1 % 360;
+  let rayLines = '';
+  for (let i = 0; i < rays; i++) {
+    const angle = (360 / rays) * i + rot;
+    const rad = angle * Math.PI / 180;
+    const r1 = h * 0.30, r2 = h * 0.30 + h * 0.16 + ((h1 >> i) % 3) * (h * 0.02);
+    const x1 = (cx + Math.cos(rad) * r1).toFixed(1), y1 = (cy + Math.sin(rad) * r1).toFixed(1);
+    const x2 = (cx + Math.cos(rad) * r2).toFixed(1), y2 = (cy + Math.sin(rad) * r2).toFixed(1);
+    rayLines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${gold}" stroke-width="1" opacity="0.28"/>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stop-color="#0c0e13"/>
-        <stop offset="55%" stop-color="#161a24"/>
+        <stop offset="55%" stop-color="#181c28"/>
         <stop offset="100%" stop-color="#0a0b0f"/>
       </linearGradient>
-      <radialGradient id="glow" cx="50%" cy="42%" r="60%">
-        <stop offset="0%" stop-color="${gold}" stop-opacity="0.16"/>
+      <radialGradient id="glow" cx="50%" cy="40%" r="65%">
+        <stop offset="0%" stop-color="${gold}" stop-opacity="0.22"/>
         <stop offset="100%" stop-color="${gold}" stop-opacity="0"/>
       </radialGradient>
+      <linearGradient id="med" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${gold2}"/>
+        <stop offset="100%" stop-color="${gold}"/>
+      </linearGradient>
     </defs>
     <rect width="${w}" height="${h}" fill="url(#bg)"/>
     <rect width="${w}" height="${h}" fill="url(#glow)"/>
-    <g opacity="0.5" stroke="${gold}" stroke-width="1">
-      <path d="M ${w*0.06} ${h*0.14} h 46 M ${w*0.06} ${h*0.14} v 46" fill="none"/>
-      <path d="M ${w*0.94} ${h*0.86} h -46 M ${w*0.94} ${h*0.86} v -46" fill="none"/>
+    ${rayLines}
+    <g stroke="${gold}" stroke-width="1.4" opacity="0.7">
+      <path d="M ${w*0.05} ${h*0.10} h 54 M ${w*0.05} ${h*0.10} v 54" fill="none"/>
+      <path d="M ${w*0.95} ${h*0.90} h -54 M ${w*0.95} ${h*0.90} v -54" fill="none"/>
     </g>
-    <circle cx="${w/2}" cy="${h*0.44}" r="${h*0.24}" fill="none" stroke="${gold}" stroke-width="1.5" opacity="0.55"/>
-    <circle cx="${w/2}" cy="${h*0.44}" r="${h*0.30}" fill="none" stroke="${gold}" stroke-width="1" opacity="0.25"/>
-    <text x="50%" y="${h*0.44}" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="${h*0.22}" fill="${gold2}" opacity="0.92">${svgEsc(numeral || '❧')}</text>
-    <text x="50%" y="${h*0.84}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="20" letter-spacing="2" fill="#cfc9bd" opacity="0.75">${short}</text>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.30}" fill="none" stroke="${gold}" stroke-width="2" opacity="0.7"/>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.34}" fill="none" stroke="${gold}" stroke-width="1" opacity="0.35"/>
+    <circle cx="${cx}" cy="${cy}" r="${h*0.255}" fill="rgba(0,0,0,.15)" stroke="${gold}" stroke-width="1" opacity="0.5"/>
+    <text x="50%" y="${cy}" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="${h*0.34}" fill="url(#med)">${svgEsc(numeral || '❧')}</text>
+    <text x="50%" y="${h*0.89}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="24" letter-spacing="1" fill="#e7e2d5" opacity="0.9">${short}</text>
   </svg>`;
 }
 
 function chapterPlateUri(label, numeral, w = 900, h = 500) {
   return 'data:image/svg+xml,' + encodeURIComponent(chapterPlateSvg(label, numeral, w, h));
+}
+
+// Full-bleed, topic-unique ornamental background for the cover page —
+// concentric rings + a radiating star pattern, seeded from the book title
+// so every book gets a distinct look instead of a flat gradient.
+function coverArtSvg(seedText, w = 800, h = 1200) {
+  const h1 = hashStr(seedText || 'book');
+  const hueShift = (h1 % 20) - 10;
+  const gold = `hsl(${43 + hueShift},60%,58%)`;
+  const cx = w / 2, cy = h * 0.36;
+  const rays = 10 + (h1 % 8);
+  const rot = h1 % 360;
+  let rayLines = '';
+  for (let i = 0; i < rays; i++) {
+    const angle = (360 / rays) * i + rot;
+    const rad = angle * Math.PI / 180;
+    const r1 = h * 0.15, r2 = h * 0.30 + ((h1 >> i) % 3) * (h * 0.015);
+    const x1 = (cx + Math.cos(rad) * r1).toFixed(1), y1 = (cy + Math.sin(rad) * r1).toFixed(1);
+    const x2 = (cx + Math.cos(rad) * r2).toFixed(1), y2 = (cy + Math.sin(rad) * r2).toFixed(1);
+    rayLines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${gold}" stroke-width="1" opacity="0.3"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id="cg" cx="50%" cy="32%" r="55%">
+        <stop offset="0%" stop-color="${gold}" stop-opacity="0.16"/>
+        <stop offset="100%" stop-color="${gold}" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="${w}" height="${h}" fill="url(#cg)"/>
+    ${rayLines}
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.145}" fill="none" stroke="${gold}" stroke-width="1.2" opacity="0.5"/>
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.19}" fill="none" stroke="${gold}" stroke-width="0.8" opacity="0.32"/>
+    <circle cx="${cx}" cy="${cy}" r="${h * 0.235}" fill="none" stroke="${gold}" stroke-width="0.6" opacity="0.18"/>
+  </svg>`;
+}
+
+function coverArtUri(seedText, w = 800, h = 1200) {
+  return 'data:image/svg+xml,' + encodeURIComponent(coverArtSvg(seedText, w, h));
 }
 
 async function fetchUnsplashUrl(query) {
@@ -1157,7 +1213,13 @@ function setRunningHead(text) {
 //  TEXT FORMATTER
 // ══════════════════════════════════════════════════════════════
 function fmt(text, dropcap = false) {
-  if (!text) return '';
+  return fmtBlocks(text, dropcap).join('');
+}
+
+// Same as fmt() but returns each block (paragraph/heading/list) separately,
+// so long chapter bodies can be split across multiple printed pages.
+function fmtBlocks(text, dropcap = false) {
+  if (!text) return [];
   let html = text
     .replace(/^###\s+(.+)$/gm, '<div class="pg-h3">$1</div>')
     .replace(/^##\s+(.+)$/gm, '<div class="pg-h2">$1</div>')
@@ -1191,7 +1253,23 @@ function fmt(text, dropcap = false) {
     }
   });
   closeList();
-  return out.join('');
+  return out;
+}
+
+// Group formatted content blocks into page-sized chunks by accumulated
+// text length, so a long chapter prints as several real pages instead of
+// one tall scrolling div.
+function groupBlocksByLength(blocks, maxChars = 1600) {
+  const groups = [];
+  let cur = [], curLen = 0;
+  blocks.forEach(b => {
+    const len = b.replace(/<[^>]+>/g, '').length;
+    if (cur.length && curLen + len > maxChars) { groups.push(cur); cur = []; curLen = 0; }
+    cur.push(b);
+    curLen += len;
+  });
+  groups.push(cur);
+  return groups;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1238,9 +1316,11 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
 
   const isAr = lang === 'Arabic';
   const chLabel = isAr ? 'الفصل' : 'Chapter';
+  const numStr = String(num).padStart(2, '0');
 
-  let html = `
-    <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${String(num).padStart(2,'0')}</span></div>
+  // ── Front matter: label, title, rule, hook, image, stat boxes ──
+  let frontHtml = `
+    <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${numStr}</span></div>
     <div class="pg-title">${esc(ch.title)}</div>
     <div class="pg-rule"></div>
     ${intro ? `<div class="pg-intro">${esc(intro)}</div>` : (ch.subtitle ? `<div class="pg-intro">${esc(ch.subtitle)}</div>` : '')}
@@ -1249,8 +1329,8 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
   // Image
   if (featFlags.images) {
     const imgQuery = `${topic} ${ch.title}`;
-    const imgSrc = await getChapterImageSrc(imgQuery, ch.title, String(num).padStart(2, '0'));
-    html += `
+    const imgSrc = await getChapterImageSrc(imgQuery, ch.title, numStr);
+    frontHtml += `
       <div class="img-block">
         <img src="${imgSrc}" alt="${esc(ch.title)}" loading="lazy" onerror="this.parentElement.style.display='none'">
         <div class="img-caption">${esc(ch.title)}</div>
@@ -1263,30 +1343,24 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
     try {
       const statsArr = statsData.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3);
       if (statsArr.length >= 2) {
-        html += '<div class="stat-row">';
+        frontHtml += '<div class="stat-row">';
         statsArr.forEach(s => {
-          const [num, unit, label] = s.split(',').map(x => x.trim());
-          html += `<div class="stat-box"><div class="stat-num">${esc(num)}</div><div class="stat-unit">${esc(unit)}</div><div class="stat-label">${esc(label)}</div></div>`;
+          const [n, unit, label] = s.split(',').map(x => x.trim());
+          frontHtml += `<div class="stat-box"><div class="stat-num">${esc(n)}</div><div class="stat-unit">${esc(unit)}</div><div class="stat-label">${esc(label)}</div></div>`;
         });
-        html += '</div>';
+        frontHtml += '</div>';
       }
     } catch {}
   }
 
-  // Body text
-  html += fmt(body, featFlags.dropcap);
+  // ── Body text, split across as many pages as it needs ──
+  const bodyGroups = groupBlocksByLength(fmtBlocks(body, featFlags.dropcap), 1600);
 
-  // Quote
-  if (featFlags.quotes && quote) {
-    html += `<div class="pg-quote">${esc(quote)}</div>`;
-  }
+  // ── Chapter extras (quote, chart, table, tips...) ride the last page ──
+  let extrasHtml = '';
+  if (featFlags.quotes && quote) extrasHtml += `<div class="pg-quote">${esc(quote)}</div>`;
+  if (featFlags.ornaments) extrasHtml += `<div class="pg-ornament">— ✦ —</div>`;
 
-  // Ornament
-  if (featFlags.ornaments) {
-    html += `<div class="pg-ornament">— ✦ —</div>`;
-  }
-
-  // Chart
   let pendingChart = null;
   if (featFlags.charts && chartData) {
     try {
@@ -1295,7 +1369,7 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
       if (cd) {
         const canvasId = 'chart_' + num + '_' + Date.now();
         const chartTitle = cd.title || (isAr ? 'إحصاءات الفصل' : 'Chapter Statistics');
-        html += `
+        extrasHtml += `
           <div class="chart-wrap">
             <div class="chart-title">${esc(chartTitle)}</div>
             <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
@@ -1305,14 +1379,13 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
     } catch {}
   }
 
-  // Table
   if (featFlags.tables && tableData) {
     try {
       let td;
       try { td = JSON.parse(tableData.replace(/```json|```/g, '').trim()); } catch { td = null; }
       if (td && td.headers && td.rows) {
         const tLabel = td.title || (isAr ? 'جدول البيانات' : 'Data Table');
-        html += `
+        extrasHtml += `
           <div class="table-title">${esc(tLabel)}</div>
           <table class="pg-table">
             <thead><tr>${td.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
@@ -1323,14 +1396,12 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
     } catch {}
   }
 
-  // Tips
   if (featFlags.tips && tips.length > 0) {
-    html += `<div class="tip-box"><div class="tip-box-hd">💡 ${isAr ? 'نصائح ذهبية' : 'Golden Tips'}</div>${tips.map(t => `<div class="tip-item"><strong>${esc(t.t)}</strong>: ${esc(t.b)}</div>`).join('')}</div>`;
+    extrasHtml += `<div class="tip-box"><div class="tip-box-hd">💡 ${isAr ? 'نصائح ذهبية' : 'Golden Tips'}</div>${tips.map(t => `<div class="tip-item"><strong>${esc(t.t)}</strong>: ${esc(t.b)}</div>`).join('')}</div>`;
   }
 
-  // Checklist
   if (featFlags.checklist && checklist.length > 0) {
-    html += `
+    extrasHtml += `
       <div class="callout jade">
         <div class="callout-title">✅ ${isAr ? 'قائمة التحقق' : 'Action Checklist'}</div>
         <div class="callout-body">
@@ -1339,26 +1410,35 @@ async function renderChapter(ch, num, topic, lang, featFlags) {
       </div>`;
   }
 
-  // Case study
   if (featFlags.casestudy && caseStudy) {
-    html += `
+    extrasHtml += `
       <div class="callout sky">
         <div class="callout-title">🔍 ${isAr ? 'دراسة حالة' : 'Case Study'}</div>
         <div class="callout-body">${esc(caseStudy)}</div>
       </div>`;
   }
 
-  // Exercise
   if (featFlags.exercise && exercise) {
-    html += `
+    extrasHtml += `
       <div class="exercise">
         <div class="exercise-hd">🎯 ${isAr ? 'تمرين عملي' : 'Practical Exercise'}</div>
         <div class="exercise-body">${esc(exercise)}</div>
       </div>`;
   }
 
-  makePage(html);
-  setRunningHead(ch.title);
+  // ── Emit one page per body group; extras land on the final page ──
+  for (let g = 0; g < bodyGroups.length; g++) {
+    const isFirst = g === 0;
+    const isLast = g === bodyGroups.length - 1;
+    let pageHtml = isFirst ? frontHtml : `
+      <div class="pg-chapter-label">${chLabel} ${num} · <span class="pg-chapter-num">${numStr}</span> — ${isAr ? 'تابع' : 'cont.'}</div>
+      <div class="pg-rule"></div>`;
+    pageHtml += bodyGroups[g].join('');
+    if (isLast) pageHtml += extrasHtml;
+    makePage(pageHtml);
+    setRunningHead(ch.title);
+  }
+
   if (pendingChart) pendingChart();
 }
 
@@ -1435,7 +1515,7 @@ async function generateBook() {
   // ── RENDER COVER ─────────────────────────────────────────
   setStatus('رسم الغلاف...', 'busy', 12);
   makePage(`
-    <div class="cover-bg"></div>
+    <div class="cover-bg" style="background-image:url('${coverArtUri(finalTitle + bookType)}');background-size:cover;background-position:center"></div>
     <div class="cover-corners"></div>
     <div class="cover-inner">
       <div class="cover-ornament">❧ ${bookType.toUpperCase()} ❧</div>
@@ -1489,7 +1569,7 @@ async function generateBook() {
   setStatus('كتابة المقدمة...', 'busy', 18);
   let introText;
   try {
-    introText = await ai(promptIntro(finalTitle, subtitle, topic, bookType, tone, lang, audience, book.chapters));
+    introText = await ai(promptIntro(finalTitle, subtitle, topic, bookType, tone, lang, audience, book.chapters), 6000);
   } catch(e) { return handleErr(e); }
 
   const introParts = introText.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
@@ -1520,7 +1600,7 @@ async function generateBook() {
     const pct = 20 + Math.round((i / chapters.length) * 65);
     setStatus(`✍️ كتابة الفصل ${i + 1} / ${chapters.length}: ${ch.title}`, 'busy', pct);
     try {
-      const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 4500);
+      const content = await ai(promptChapter(ch, i + 1, finalTitle, topic, bookType, tone, lang, audience, featFlags, notes), 9000);
       ch.content = content;
       await renderChapter(ch, i + 1, topic, lang, featFlags);
     } catch(e) { return handleErr(e); }
@@ -1530,7 +1610,7 @@ async function generateBook() {
   setStatus('كتابة الخاتمة...', 'busy', 88);
   let conc;
   try {
-    conc = await ai(promptConclusion(finalTitle, topic, bookType, tone, lang, audience, chapters));
+    conc = await ai(promptConclusion(finalTitle, topic, bookType, tone, lang, audience, chapters), 6000);
   } catch(e) { return handleErr(e); }
 
   const concParts = conc.split('[SECTION_BREAK]').map(s => s.trim()).filter(Boolean);
@@ -1645,7 +1725,7 @@ Chapter overview:
 ${chList}
 
 Write:
-1. INTRODUCTION (400-500 words in ${lang}): Hook with a powerful story or statistic, explain the problem, promise the transformation, preview chapters. Be specific, emotional, and human.
+1. INTRODUCTION (650-800 words in ${lang}): Hook with a powerful story or statistic, explain the problem in depth, promise the transformation, preview chapters. Be specific, emotional, and human.
 
 2. HOW TO USE THIS BOOK (120 words in ${lang}): Practical reading guide.
 
@@ -1664,17 +1744,18 @@ Key points: ${(ch.keyPoints||[]).join(', ')}
 Language: ${lang} | Audience: ${audience} | Tone: ${tone}
 ${notes ? `Special notes: ${notes}` : ''}
 
-Write 800-1000 words of original, expert-level content. Use this exact structure:
+Write 1600-2200 words of original, expert-level content — this is a full, substantial chapter, not a summary. Use this exact structure:
 
 [CHAPTER_INTRO]
 2-3 sentence hook that grabs the reader immediately.
 
 [BODY]
-Main chapter content with ## and ### headings. Cover all key points with:
+Main chapter content, organized into 4-6 clearly separated sections, each starting with a ## heading (use ### for any sub-points). Cover every key point in real depth with:
 - Specific examples and real-world applications
 - Varied sentence structure
 - Actionable insights
 - Natural expert voice
+Do not pad with filler — add depth and more concrete examples per section instead of repeating ideas.
 ${f.quotes ? "Include: [QUOTE]An impactful quote from a known figure relevant to this chapter[/QUOTE]" : ''}
 
 ${f.stats ? `[STATS]
@@ -1710,11 +1791,11 @@ Chapters covered: ${(chapters||[]).map(c => c.title).join(', ')}
 
 Write four sections separated by [SECTION_BREAK]:
 
-Section 1 — CONCLUSION (300-380 words): Powerful emotional close. Summarize the journey, reinforce the transformation, end with an inspiring unforgettable statement.
+Section 1 — CONCLUSION (450-550 words): Powerful emotional close. Summarize the journey, reinforce the transformation, end with an inspiring unforgettable statement.
 
-Section 2 — BONUS (150 words): A valuable bonus tip, resource list, or quick-reference guide related to ${topic}.
+Section 2 — BONUS (250-300 words): A valuable bonus tip, resource list, or quick-reference guide related to ${topic}.
 
-Section 3 — ABOUT AUTHOR (100 words): Third-person author bio for a specialist in ${topic}.
+Section 3 — ABOUT AUTHOR (120-150 words): Third-person author bio for a specialist in ${topic}.
 
 ${isAr ? 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.' : 'Section 4 — GLOSSARY: List 8-10 key terms from the book with brief definitions.'}
 
